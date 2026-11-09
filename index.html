@@ -3,19 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>안드로이드 위클리 공부 노트</title>
-<!-- https://2giwon.github.io/ 로 들어오면 블로그로 바로 넘긴다 -->
+<title>작업노트</title>
 <!-- 이 페이지는 색인하지 않는다. canonical 을 두었더니 Google 이 이 짧은 주소를 블로그 첫 페이지 대신
      대표로 골라 블로그 첫 페이지가 색인에서 빠졌다(2026-10-24 Search Console "Google에서 사용자와 다른 표준을 선택함") -->
 <meta name="robots" content="noindex">
-<meta http-equiv="refresh" content="0; url=/android-weekly-study/">
-<script>location.replace('/android-weekly-study/' + location.search + location.hash);</script>
-<style>
-  body { margin: 0; padding: 48px 16px; background: #eef1f4; color: #1b2733; font: 16px/1.7 system-ui, sans-serif; text-align: center; }
-  @media (prefers-color-scheme: dark) { body { background: #141b22; color: #e4e9ee; } a { color: inherit; } }
-</style>
+<!-- 화면 코드만 공개된다. 문서는 브라우저가 토큰으로 GitHub API 에서 직접 받는다.
+     스크립트는 이 사이트 파일만, 요청은 api.github.com 만 허용한다(Mermaid 가 인라인 style 을 쓴다) -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://api.github.com; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<link rel="stylesheet" href="app/style.css">
+<script src="vendor/mermaid.min.js" defer></script>
+<script src="vendor/chart.umd.min.js" defer></script>
+<script type="module" src="app/main.mjs"></script>
 </head>
 <body>
-<p>블로그로 이동하고 있습니다. 자동으로 넘어가지 않으면 <a href="/android-weekly-study/">안드로이드 위클리 공부 노트</a>를 눌러 주세요.</p>
+<main id="app" aria-live="polite"></main>
 </body>
 </html>

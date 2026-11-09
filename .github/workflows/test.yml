@@ -1,0 +1,27 @@
+# 화면 로직 테스트. 배포는 Pages legacy(main 루트 그대로)라 여기서 하지 않는다.
+# 서드파티 액션 없이 GitHub 공식 액션만 쓴다.
+
+name: 테스트
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # `node --test test/` 는 Node 22에서 디렉터리를 모듈로 해석해 실패한다. 파일을 명시한다.
+      - name: 테스트
+        run: node --test test/*.test.mjs
