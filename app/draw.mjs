@@ -22,7 +22,28 @@ export function disposeDetachedCharts() {
   }
 }
 
-function ensureMermaid() {
+let mermaidLoading = null;
+
+/** 흐름도 도구를 처음 필요할 때 한 번만 받아 온다(5.5MB 라 첫 화면을 막지 않게). */
+function loadMermaid() {
+  if (globalThis.mermaid) return Promise.resolve();
+  if (!mermaidLoading) {
+    mermaidLoading = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = new URL('../vendor/mermaid.min.js', import.meta.url).href;
+      s.onload = () => resolve();
+      s.onerror = () => {
+        mermaidLoading = null; // 다음 그림에서 다시 시도
+        reject(new Error('흐름도 도구를 받지 못했습니다'));
+      };
+      document.head.append(s);
+    });
+  }
+  return mermaidLoading;
+}
+
+async function ensureMermaid() {
+  await loadMermaid();
   const m = globalThis.mermaid;
   if (!m) throw new Error('Mermaid 를 불러오지 못했습니다');
   if (!mermaidReady) {
@@ -44,7 +65,7 @@ async function drawMermaid(box, f) {
   };
   let svg;
   try {
-    ({ svg } = await ensureMermaid().render(id, f.code));
+    ({ svg } = await (await ensureMermaid()).render(id, f.code));
   } finally {
     cleanup();
   }

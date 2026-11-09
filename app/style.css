@@ -44,6 +44,8 @@ button.primary {
   padding: 10px 16px; font-weight: 600; cursor: pointer; width: 100%;
 }
 
+.boot { margin: 48px 0; text-align: center; color: var(--muted); }
+
 /* 위 막대 */
 .topbar {
   position: sticky; top: 0; z-index: 5;

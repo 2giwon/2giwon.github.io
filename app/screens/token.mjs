@@ -47,12 +47,8 @@ export function tokenScreen({ reason = null, onSaved }) {
     reason ? h('p', { class: 'banner warn', role: 'alert' }, reason) : null,
     h('p', null, '나만 보는 작업 문서 화면입니다. 토큰을 넣어야 볼 수 있습니다.'),
     form,
-    h(
-      'p',
-      { class: 'hint' },
-      'GitHub에서 labmanager-docs, personal-docs 두 저장소에 Contents 읽기 권한만 준 토큰을 만들어 넣으세요. ',
-      h('a', { href: NEW_TOKEN_URL, target: '_blank', rel: 'noopener noreferrer' }, '토큰 만들러 가기')
-    ),
+    // 저장소 이름과 권한 설명은 화면에 적지 않는다(누구나 보는 화면이라, 사용자 요청 11-09). 링크만 둔다
+    h('p', { class: 'hint' }, h('a', { href: NEW_TOKEN_URL, target: '_blank', rel: 'noopener noreferrer' }, '토큰 만들러 가기')),
     h('a', { class: 'blog-link', href: '/android-weekly-study/' }, '안드로이드 위클리 공부 노트 보러 가기 →')
   );
 }

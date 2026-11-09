@@ -15,5 +15,3 @@ node tools/notes-check.mjs <문서repo경로>           # 그림 데이터 형�
 ```
 
 `package.json` 이 없다. 일부러다 — Node 내장 기능과 `vendor/` 고정 파일만 쓴다. 배포는 Pages legacy(main 루트 그대로)다.
-
-설계와 결정 기록: `~/Documents/personal-docs/2giwon.github.io/`
