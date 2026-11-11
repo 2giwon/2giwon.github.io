@@ -40,6 +40,7 @@ export const ERROR_TEXT = {
   forbidden: '이 저장소를 읽을 권한이 없습니다',
   not_found: '저장소를 찾지 못했습니다(토큰에 이 저장소 권한이 없을 때도 이렇게 보입니다)',
   rate_limited: 'GitHub 요청 한도를 넘었습니다. 잠시 뒤 다시 시도해 주세요',
+  conflict: '다른 곳에서 동시에 고쳤습니다. 다시 시도해 주세요',
   network: '네트워크에 연결되지 않았습니다',
   unknown: '알 수 없는 오류가 났습니다',
 };

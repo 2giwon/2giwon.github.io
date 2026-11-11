@@ -5,6 +5,7 @@ import { createGitHub, GitHubError } from './github.mjs';
 import { buildCatalog, projectIdsFor, LAB, PERSONAL } from './catalog.mjs';
 import { parseFigures, figureState } from './figures.mjs';
 import { cache as defaultCache } from './cache.mjs';
+import { parseTasks, emptyTasks, serializeTasks, TASKS_REPO, TASKS_PATH } from './todo.mjs';
 
 const FALLBACK_KINDS = new Set(['network', 'rate_limited', 'unknown']);
 const treeKey = (repo) => `worknote.tree.${repo}`;
@@ -104,8 +105,42 @@ export function createStore({
     return buildCatalog({ lab, personal, personalReadme, lastDates: dates, today: today() });
   }
 
+  /**
+   * 할 일 파일. 캐시하지 않는다(폰과 /todo 가 함께 고치는 파일이라 늘 최신을 읽는다).
+   * @returns {Promise<{state:'ok'|'missing', data:object, sha:string|null} | {state:'invalid', error:string}>}
+   */
+  async function tasks() {
+    const file = await gh.readFile(TASKS_REPO, TASKS_PATH);
+    if (!file) return { state: 'missing', data: emptyTasks(), sha: null };
+    const r = parseTasks(file.text);
+    return r.ok ? { state: 'ok', data: r.data, sha: file.sha } : { state: 'invalid', error: r.error };
+  }
+
+  /**
+   * 읽기 → change(data) → 쓰기. 그 사이 다른 곳이 먼저 바꿔 충돌하면 다시 읽어 한 번 더 시도한다.
+   * change 는 매번 최신 파일에 다시 적용되므로 순수 함수여야 한다(todo.mjs 의 바꾸기 함수).
+   * @returns {Promise<{data:object, sha:string|null}>}
+   */
+  async function updateTasks(change, message) {
+    for (let attempt = 0; ; attempt += 1) {
+      if (disposed) throw new GitHubError('unauthorized', null, '토큰을 지웠습니다');
+      const cur = await tasks();
+      if (cur.state === 'invalid') throw new Error(`할 일 파일 형식이 맞지 않습니다 (${cur.error})`);
+      const next = change(cur.data);
+      if (disposed) throw new GitHubError('unauthorized', null, '토큰을 지웠습니다');
+      try {
+        const sha = await gh.writeFile(TASKS_REPO, TASKS_PATH, serializeTasks(next), cur.sha, message);
+        return { data: next, sha };
+      } catch (e) {
+        if (!(e instanceof GitHubError && e.kind === 'conflict') || attempt >= 1) throw e;
+      }
+    }
+  }
+
   return {
     state,
+    tasks,
+    updateTasks,
     /** 토큰 지우기. 이후 도착하는 응답은 저장하지 않는다. */
     dispose() {
       disposed = true;

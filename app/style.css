@@ -99,6 +99,47 @@ button.primary {
 
 .muted { color: var(--muted); font-size: 13px; margin: 0; }
 
+/* 오늘 할 일 (11-11) */
+.today .today-body { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 14px 12px; }
+.today-status { margin: 0 0 6px; font-size: 13px; color: var(--muted); min-height: 0; }
+.today-status:empty { display: none; }
+.today-status.error { color: var(--risk); }
+.today-list { list-style: none; margin: 0; padding: 0; }
+.today-item {
+  display: grid; grid-template-columns: 28px 1fr; gap: 4px 10px; align-items: start;
+  padding: 10px 0; border-bottom: 1px solid var(--line);
+}
+.today-item.stage-urgent { box-shadow: inset 3px 0 0 var(--risk); padding-left: 8px; margin-left: -8px; }
+.today-check {
+  width: 22px; height: 22px; margin-top: 2px; border: 2px solid var(--line); border-radius: 6px;
+  background: var(--surface); cursor: pointer; padding: 0;
+}
+.today-check:hover:not(:disabled) { border-color: var(--ok); }
+.today-main { min-width: 0; }
+.today-title { display: block; overflow-wrap: anywhere; }
+.today-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 2px; font-size: 12px; color: var(--muted); }
+.today-meta .badge { margin-left: 0; }
+.badge.stage.urgent, .badge.risk { background: #ffebe9; color: var(--risk); }
+.badge.stage.relaxed { background: #eef1f4; color: var(--muted); }
+.badge.stage.normal { background: #e8f1ff; color: #0b3a82; }
+.badge.ticket { background: #e8f1ff; color: var(--brand); }
+.today-project { overflow-wrap: anywhere; }
+.today-actions { grid-column: 2; display: flex; align-items: center; gap: 12px; font-size: 13px; }
+.today-actions select, .today-add select { font: inherit; font-size: 13px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+.today-add { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.today-input { flex: 1 1 100%; font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+@media (min-width: 520px) { .today-input { flex-basis: 0; } }
+.today-add-btn { font: inherit; font-size: 13px; font-weight: 600; padding: 6px 14px; border: 0; border-radius: 8px; background: var(--brand); color: #fff; cursor: pointer; }
+.today-add-btn:disabled, .today-check:disabled { opacity: 0.5; cursor: default; }
+.today-done { list-style: none; margin: 10px 0 0; padding: 0; font-size: 13px; color: var(--muted); }
+.today-done li { text-decoration: line-through; padding: 2px 0; }
+.today-done-mark { color: var(--ok); margin-right: 6px; text-decoration: none; display: inline-block; }
+.today-later { margin-top: 12px; }
+.today-later summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+.today-later ul { list-style: none; margin: 8px 0 0; padding: 0; font-size: 14px; }
+.today-later li { display: flex; gap: 10px; align-items: baseline; padding: 4px 0; border-bottom: 1px dashed var(--line); }
+.today-later-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+
 .archived { margin-top: 12px; background: var(--surface); border: 1px dashed var(--line); border-radius: var(--radius); padding: 10px 14px; }
 .archived summary { cursor: pointer; color: var(--muted); }
 .archived ul { margin: 8px 0 0; padding-left: 18px; }

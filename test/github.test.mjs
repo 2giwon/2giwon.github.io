@@ -133,3 +133,63 @@ test('500 은 unknown', async () => {
   const gh = createGitHub({ token: 'tk', fetch: fakeFetch(() => res(500, {})) });
   assert.equal(await kindOf(gh.tree('personal-docs')), 'unknown');
 });
+
+// ─── 할 일 파일 읽기, 쓰기 (11-11) ────────────────────────────────────────────
+
+const b64 = (s) => Buffer.from(s, 'utf8').toString('base64');
+
+test('9. readFile 은 한글 내용(UTF-8)과 sha 를 돌려준다', async () => {
+  const text = '{"title":"보관위치 400"}\n';
+  // GitHub 은 base64 를 60자마다 줄바꿈해서 준다
+  const content = b64(text).replace(/(.{20})/g, '$1\n');
+  const fetch = fakeFetch(() => res(200, { content, encoding: 'base64', sha: 's1' }));
+  const gh = createGitHub({ token: 'tk', fetch });
+  assert.deepEqual(await gh.readFile('personal-docs', 'todo/tasks.json'), { text, sha: 's1' });
+  assert.equal(fetch.calls[0].url, 'https://api.github.com/repos/2giwon/personal-docs/contents/todo/tasks.json');
+});
+
+test('9. readFile 은 파일이 없으면(404) null', async () => {
+  const gh = createGitHub({ token: 'tk', fetch: fakeFetch(() => res(404, {})) });
+  assert.equal(await gh.readFile('personal-docs', 'todo/tasks.json'), null);
+});
+
+test('10. writeFile 은 PUT 본문에 base64 UTF-8, sha, message 를 담고 새 sha 를 돌려준다', async () => {
+  const fetch = fakeFetch(() => res(200, { content: { sha: 's2' } }));
+  const gh = createGitHub({ token: 'tk', fetch });
+  const sha = await gh.writeFile('personal-docs', 'todo/tasks.json', '할 일\n', 's1', '할 일 추가: 가');
+  assert.equal(sha, 's2');
+  const { init } = fetch.calls[0];
+  assert.equal(init.method, 'PUT');
+  assert.equal(init.headers.Authorization, 'Bearer tk');
+  assert.deepEqual(JSON.parse(init.body), { message: '할 일 추가: 가', content: b64('할 일\n'), sha: 's1' });
+});
+
+test('10. writeFile 은 sha 가 null 이면 sha 없이 보낸다(새 파일)', async () => {
+  const fetch = fakeFetch(() => res(201, { content: { sha: 'n1' } }));
+  const gh = createGitHub({ token: 'tk', fetch });
+  await gh.writeFile('personal-docs', 'todo/tasks.json', 'x', null, 'm');
+  assert.equal('sha' in JSON.parse(fetch.calls[0].init.body), false);
+});
+
+test('10. writeFile 은 409, 422 를 conflict, 403 을 forbidden 으로', async () => {
+  for (const [status, kind] of [
+    [409, 'conflict'],
+    [422, 'conflict'],
+    [403, 'forbidden'],
+  ]) {
+    const gh = createGitHub({ token: 'tk', fetch: fakeFetch(() => res(status, {})) });
+    assert.equal(await kindOf(gh.writeFile('personal-docs', 'todo/tasks.json', 'x', 's', 'm')), kind);
+  }
+});
+
+test('14. 할 일 파일이 아닌 경로에는 쓰지 않는다(요청도 보내지 않는다)', async () => {
+  const fetch = fakeFetch(() => res(200, { content: { sha: 'x' } }));
+  const gh = createGitHub({ token: 'tk', fetch });
+  for (const [repo, path] of [
+    ['personal-docs', 'README.md'],
+    ['labmanager-docs', 'todo/tasks.json'],
+  ]) {
+    await assert.rejects(gh.writeFile(repo, path, 'x', 's', 'm'));
+  }
+  assert.equal(fetch.calls.length, 0);
+});
