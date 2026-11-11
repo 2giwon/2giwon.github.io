@@ -11,6 +11,8 @@
      스크립트는 이 사이트 파일만, 요청은 api.github.com 만 허용한다(Mermaid 가 인라인 style 을 쓴다) -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://api.github.com; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
+<!-- 파비콘: 블로그와 같은 남색 바탕에 체크 목록(11-11). CSP img-src 'self' 로 허용된다 -->
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="app/style.css">
 <!-- mermaid(5.5MB)는 여기서 받지 않는다. 흐름도를 처음 그릴 때 draw.mjs 가 받아 온다(첫 화면이 기다리지 않게) -->
 <script src="vendor/chart.umd.min.js" defer></script>
