@@ -73,6 +73,28 @@ function scriptedFetch({ gets = [], puts = [] }) {
 }
 const getFile = (text, sha) => ({ status: 200, body: { content: b64(text), encoding: 'base64', sha } });
 const makeStore = (fetch) => createStore({ token: 'tk', fetch, storage: memoryStorage(), session: memoryStorage(), cache: memoryCache() });
+
+// ─── 바로가기 파일 (11-11) ───────────────────────────────────────────────────
+
+test('links() 는 바로가기 파일을 읽고, 없으면 빈 목록, 형식이 틀리면 invalid', async () => {
+  const fetch = scriptedFetch({ gets: [getFile(JSON.stringify({ links: [{ title: 'cmux 원격', url: 'http://100.68.32.7:4399/' }] }), 's1')] });
+  const ok = await makeStore(fetch).links();
+  assert.deepEqual(ok, { state: 'ok', links: [{ title: 'cmux 원격', url: 'http://100.68.32.7:4399/' }] });
+  assert.match(fetch.calls[0].url, /personal-docs\/contents\/worknote\/links\.json$/);
+  assert.deepEqual(await makeStore(scriptedFetch({ gets: [{ status: 404 }] })).links(), { state: 'missing', links: [] });
+  assert.equal((await makeStore(scriptedFetch({ gets: [getFile('{ 깨짐', 's1')] })).links()).state, 'invalid');
+});
+
+test('links() 는 한 번 읽은 결과를 다시 쓰고, force 일 때와 실패한 뒤에만 다시 읽는다', async () => {
+  const file = getFile(JSON.stringify({ links: [] }), 's1');
+  const fetch = scriptedFetch({ gets: [{ status: 500 }, file, file] });
+  const store = makeStore(fetch);
+  await assert.rejects(store.links());
+  await store.links(); // 실패는 남기지 않아 다시 읽는다
+  await store.links(); // 성공 결과를 다시 쓴다(요청 없음)
+  await store.links(true); // 새로 고침
+  assert.equal(fetch.calls.length, 3);
+});
 const addOne = (title) => (data) => ({ ...data, nextId: data.nextId + 1, tasks: [...data.tasks, { id: data.nextId, title }] });
 
 test('11. 저장 중 충돌(409)이면 다시 읽어 최신 파일에 바꾸기를 다시 적용해 성공한다', async () => {

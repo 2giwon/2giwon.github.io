@@ -6,6 +6,7 @@ import { buildCatalog, projectIdsFor, LAB, PERSONAL } from './catalog.mjs';
 import { parseFigures, figureState } from './figures.mjs';
 import { cache as defaultCache } from './cache.mjs';
 import { parseTasks, emptyTasks, serializeTasks, TASKS_REPO, TASKS_PATH } from './todo.mjs';
+import { parseLinks, LINKS_REPO, LINKS_PATH } from './links.mjs';
 
 const FALLBACK_KINDS = new Set(['network', 'rate_limited', 'unknown']);
 const treeKey = (repo) => `worknote.tree.${repo}`;
@@ -24,6 +25,7 @@ export function createStore({
 }) {
   const gh = createGitHub({ token, fetch });
   let catalogPromise = null;
+  let linksPromise = null;
   // 토큰 지우기를 누르면 폐기된다. 그 뒤에 도착한 응답은 폰 어디에도 저장하지 않는다
   // (지운 직후 늦게 온 응답이 비공개 원문을 다시 저장하는 것을 막는다, codex P1 11-09)
   let disposed = false;
@@ -106,6 +108,24 @@ export function createStore({
   }
 
   /**
+   * 상단 바로가기. 화면을 옮길 때마다 GitHub 에 묻지 않게 한 번 읽은 결과를 쓰고,
+   * "새로 고침"(force)일 때만 다시 읽는다. 실패한 결과는 남기지 않는다.
+   * @returns {Promise<{state:'ok'|'missing', links:object[]} | {state:'invalid', error:string}>}
+   */
+  function links(force = false) {
+    if (force || !linksPromise) {
+      linksPromise = (async () => {
+        const file = await gh.readFile(LINKS_REPO, LINKS_PATH);
+        if (!file) return { state: 'missing', links: [] };
+        const r = parseLinks(file.text);
+        return r.ok ? { state: 'ok', links: r.links } : { state: 'invalid', error: r.error };
+      })();
+      linksPromise.catch(() => (linksPromise = null));
+    }
+    return linksPromise;
+  }
+
+  /**
    * 할 일 파일. 캐시하지 않는다(폰과 /todo 가 함께 고치는 파일이라 늘 최신을 읽는다).
    * @returns {Promise<{state:'ok'|'missing', data:object, sha:string|null} | {state:'invalid', error:string}>}
    */
@@ -140,6 +160,7 @@ export function createStore({
   return {
     state,
     tasks,
+    links,
     updateTasks,
     /** 토큰 지우기. 이후 도착하는 응답은 저장하지 않는다. */
     dispose() {

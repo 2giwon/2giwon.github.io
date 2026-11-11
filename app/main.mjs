@@ -67,11 +67,14 @@ async function render(force = false) {
   if (expiry === 'expired') banners.append(h('p', { class: 'banner warn' }, `적어 둔 만료일(${tokenInfo.expiresOn})이 지났습니다.`));
 
   const content = h('div', { class: 'content' });
+  // 바로가기 버튼(personal-docs/worknote/links.json). 읽는 동안은 자리만 잡고, 없으면 그리지 않고, 실패하면 알린다
+  const shortcuts = h('span', { class: 'shortcuts', 'aria-busy': 'true' });
   root.replaceChildren(
     h(
       'nav',
       { class: 'topbar' },
       h('a', { class: 'brand', href: '#/' }, '작업노트'),
+      shortcuts,
       h('a', { href: '#/folders' }, '폴더'),
       h('button', { type: 'button', class: 'link', onclick: () => void go(true) }, '새로 고침'),
       clearBtn
@@ -79,6 +82,24 @@ async function render(force = false) {
     banners,
     content
   );
+  const linkStore = store;
+  linkStore
+    .links(force)
+    .then((r) => {
+      if (seq !== renderSeq || store !== linkStore) return;
+      shortcuts.removeAttribute('aria-busy');
+      if (r.state === 'invalid') shortcuts.replaceChildren(h('span', { class: 'shortcut-error' }, '바로가기를 못 읽음'));
+      else
+        shortcuts.replaceChildren(
+          ...r.links.map((l) => h('a', { class: 'shortcut', href: l.url, target: '_blank', rel: 'noopener noreferrer' }, l.title))
+        );
+    })
+    .catch((e) => {
+      if (seq !== renderSeq || store !== linkStore) return;
+      shortcuts.removeAttribute('aria-busy');
+      if (e?.kind === 'unauthorized') return; // 목록 읽기가 토큰 화면으로 보낸다
+      shortcuts.replaceChildren(h('span', { class: 'shortcut-error' }, '바로가기를 못 읽음'));
+    });
 
   const route = parseRoute(location.hash);
   content.replaceChildren(route.name === 'dashboard' ? dashMod.dashboardLoading() : dom.skeleton(6));

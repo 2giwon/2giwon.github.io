@@ -55,7 +55,15 @@ button.primary {
   backdrop-filter: blur(6px);
   border-bottom: 1px solid var(--line);
 }
-.topbar .brand { font-weight: 700; color: var(--ink); margin-right: auto; }
+.topbar .brand { font-weight: 700; color: var(--ink); }
+/* 바로가기 버튼: 작업노트 바로 옆. 읽는 동안에도 높이를 잡아 메뉴가 밀리지 않게 한다 */
+.topbar .shortcuts { display: inline-flex; flex-wrap: wrap; gap: 6px; min-height: 28px; align-items: center; margin-right: auto; }
+.topbar .shortcut {
+  display: inline-flex; align-items: center; min-height: 28px; padding: 2px 10px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
+  font-size: 14px; font-weight: 600; text-decoration: none;
+}
+.topbar .shortcut-error { font-size: 13px; color: var(--muted); }
 
 .banner { margin: 12px 0 0; padding: 10px 12px; border-radius: 8px; font-size: 14px; }
 .banner.warn { background: #fff8e1; color: #6b4e00; }
