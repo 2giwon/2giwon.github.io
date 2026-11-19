@@ -139,10 +139,11 @@ export function todaySection(store) {
             v.doneToday.map((t) => h('li', null, h('span', { class: 'today-done-mark', 'aria-hidden': 'true' }, '✓'), t.title))
           )
         : null,
+      // 나중에는 접지 않고 늘 펼쳐 둔다 — 접어 두면 열어 보지 않게 된다(11-19 사용자 결정). 오늘 할 일보다 작게, 한 줄씩
       h(
-        'details',
-        { class: 'today-later' },
-        h('summary', null, `나중에 ${v.later.length}개`),
+        'section',
+        { class: 'today-later', 'aria-label': '나중에 할 일' },
+        h('h3', { class: 'today-later-head' }, `나중에 ${v.later.length}개`),
         v.later.length
           ? h(
               'ul',
@@ -151,7 +152,8 @@ export function todaySection(store) {
                 h(
                   'li',
                   null,
-                  h('span', { class: 'today-later-title' }, t.title),
+                  h('span', { class: `today-later-dot ${t.stage}`, title: STAGE_LABEL[t.stage], 'aria-hidden': 'true' }),
+                  h('span', { class: 'today-later-title', title: t.title }, t.title),
                   h('button', { type: 'button', class: 'link', onclick: () => void save((d) => moveToToday(d, t.id, today()), `할 일 오늘로: ${t.title}`) }, '오늘로')
                 )
               )

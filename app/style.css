@@ -142,11 +142,16 @@ button.primary {
 .today-done { list-style: none; margin: 10px 0 0; padding: 0; font-size: 13px; color: var(--muted); }
 .today-done li { text-decoration: line-through; padding: 2px 0; }
 .today-done-mark { color: var(--ok); margin-right: 6px; text-decoration: none; display: inline-block; }
-.today-later { margin-top: 12px; }
-.today-later summary { cursor: pointer; color: var(--muted); font-size: 14px; }
-.today-later ul { list-style: none; margin: 8px 0 0; padding: 0; font-size: 14px; }
-.today-later li { display: flex; gap: 10px; align-items: baseline; padding: 4px 0; border-bottom: 1px dashed var(--line); }
-.today-later-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+/* 나중에 — 늘 펼쳐 두되 오늘 할 일보다 작고 흐리게, 한 줄에 하나(11-19) */
+.today-later { margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--line); }
+.today-later-head { margin: 0 0 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.today-later ul { list-style: none; margin: 0; padding: 0; font-size: 13px; color: var(--muted); }
+.today-later li { display: flex; gap: 8px; align-items: center; padding: 3px 0; }
+.today-later .link { font-size: 12px; flex: none; }
+.today-later-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--line); }
+.today-later-dot.urgent { background: var(--risk); }
+.today-later-dot.normal { background: var(--brand); }
+.today-later-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .archived { margin-top: 12px; background: var(--surface); border: 1px dashed var(--line); border-radius: var(--radius); padding: 10px 14px; }
 .archived summary { cursor: pointer; color: var(--muted); }
