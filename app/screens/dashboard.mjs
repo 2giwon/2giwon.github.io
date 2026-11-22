@@ -1,8 +1,10 @@
-// 상태판: 오늘 할 일 → 회사 묶음 → 개인 묶음, 프로젝트 카드(최신 핸드오프의 지금 상태, 다음 할 일, 미결), 최근 타임라인, 최신 문서.
+// 상태판: 오늘 할 일 → 영상 자동화 → 회사 묶음 → 개인 묶음, 프로젝트 카드(최신 핸드오프의 지금 상태,
+// 다음 할 일, 미결), 최근 타임라인, 최신 문서.
 
 import { h, skeleton, failure, empty, errorText, koDate } from '../dom.mjs';
 import { handoverCard } from '../handover.mjs';
 import { todaySection } from './today.mjs';
+import { videoSection } from './video.mjs';
 import { recentTimeline } from '../timeline.mjs';
 import { timelineChart } from '../draw.mjs';
 import { today } from '../store.mjs';
@@ -121,11 +123,19 @@ export function dashboardLoading() {
     'div',
     { class: 'dashboard' },
     h('section', { class: 'group today' }, h('h2', null, '오늘 할 일'), skeleton(3)),
+    h('section', { class: 'group' }, h('h2', null, '영상 자동화'), h('article', { class: 'card' }, skeleton(3))),
     ['회사', '개인'].map((label) => h('section', { class: 'group' }, h('h2', null, label), h('div', { class: 'cards' }, [1, 2].map(() => h('article', { class: 'card' }, skeleton(4)))))),
     h('section', { class: 'group' }, h('h2', null, `최근 ${TIMELINE_DAYS}일`), skeleton(1, 'chart-skeleton'))
   );
 }
 
 export function dashboardScreen(store, catalog) {
-  return h('div', { class: 'dashboard' }, todaySection(store), catalog.groups.map((g) => groupSection(store, g)), timelineSection(catalog));
+  return h(
+    'div',
+    { class: 'dashboard' },
+    todaySection(store),
+    videoSection(store, catalog),
+    catalog.groups.map((g) => groupSection(store, g)),
+    timelineSection(catalog)
+  );
 }

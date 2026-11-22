@@ -11,7 +11,9 @@ const GITHUB = 'https://github.com/2giwon';
  * 샘플 화면을 새로 그릴 때 이전 것을 거둔다(draw.mjs 의 그래프 정리와 같은 방식).
  */
 let liveUrls = [];
-function revokeAll() {
+
+/** 화면을 새로 그릴 때 한 번 부른다. 한 화면에 묶음이 여러 개면 묶음마다 부르면 안 된다. */
+export function revokeSampleUrls() {
   for (const u of liveUrls) URL.revokeObjectURL(u);
   liveUrls = [];
 }
@@ -83,8 +85,12 @@ function bulletBlock(title, lines) {
   return h('section', { class: 'media-notes' }, h('h2', null, title), h('ul', null, lines.map((t) => h('li', null, t))));
 }
 
-export function mediaScreen(store, repo, folder) {
-  revokeAll(); // 이전 샘플 화면이 만든 주소를 거둔다
+/**
+ * 샘플 묶음 하나. 영상 자동화 화면(#/video)이 이것을 품고, #/media 주소는 아래 mediaScreen 이 쓴다.
+ * @param {{bare?:boolean}} opts bare 면 페이지 머리말(저장소 경로, 큰 제목)을 그리지 않는다
+ */
+export function samplePanel(store, repo, folder, opts = {}) {
+  const bare = Boolean(opts.bare);
   const root = h('article', { class: 'media' }, skeleton(2, 'title-skeleton'), skeleton(5));
   const folderUrl = `${GITHUB}/${repo}/tree/HEAD/${folder.split('/').map(encodeURIComponent).join('/')}`;
 
@@ -107,24 +113,28 @@ export function mediaScreen(store, repo, folder) {
     }
 
     const d = r.data;
-    document.title = `${d.title} - 작업노트`;
+    if (!bare) document.title = `${d.title} - 작업노트`;
     root.replaceChildren(
       h(
         'div',
         { class: 'media-page' },
-        h(
-          'header',
-          { class: 'media-head-top' },
-          h('p', { class: 'crumb' }, `${repo}  ${folder}`),
-          h('h1', null, d.title),
-          h(
-            'p',
-            { class: 'media-top-meta' },
-            d.updated ? koDate(d.updated) : null,
-            d.doc ? h('a', { href: `#/doc/${repo}/${d.doc}` }, '작업 목록 보기') : null
-          ),
-          d.note ? h('p', { class: 'summary' }, d.note) : null
-        ),
+        bare
+          ? d.note
+            ? h('p', { class: 'muted' }, d.note)
+            : null
+          : h(
+              'header',
+              { class: 'media-head-top' },
+              h('p', { class: 'crumb' }, `${repo}  ${folder}`),
+              h('h1', null, d.title),
+              h(
+                'p',
+                { class: 'media-top-meta' },
+                d.updated ? koDate(d.updated) : null,
+                d.doc ? h('a', { href: `#/doc/${repo}/${d.doc}` }, '작업 목록 보기') : null
+              ),
+              d.note ? h('p', { class: 'summary' }, d.note) : null
+            ),
         d.sentence
           ? h(
               'section',
@@ -144,4 +154,10 @@ export function mediaScreen(store, repo, folder) {
 
   void load();
   return root;
+}
+
+/** #/media 주소가 쓰는 화면. 묶음 하나를 페이지 머리말과 함께 보여 준다. */
+export function mediaScreen(store, repo, folder) {
+  revokeSampleUrls();
+  return samplePanel(store, repo, folder);
 }
