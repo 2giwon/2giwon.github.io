@@ -7,6 +7,7 @@ import { parseFigures, figureState } from './figures.mjs';
 import { cache as defaultCache } from './cache.mjs';
 import { parseTasks, emptyTasks, serializeTasks, TASKS_REPO, TASKS_PATH } from './todo.mjs';
 import { parseLinks, LINKS_REPO, LINKS_PATH } from './links.mjs';
+import { parseMediaIndex, mediaPath } from './media.mjs';
 
 const FALLBACK_KINDS = new Set(['network', 'rate_limited', 'unknown']);
 const treeKey = (repo) => `worknote.tree.${repo}`;
@@ -126,6 +127,31 @@ export function createStore({
   }
 
   /**
+   * 샘플 목록(그 폴더의 index.json). 목록(catalog)은 문서만 담으므로 경로로 바로 읽는다.
+   * @returns {Promise<{state:'ok', data:object} | {state:'missing'} | {state:'invalid', error:string}>}
+   */
+  async function mediaIndex(repo, folder) {
+    let text;
+    try {
+      text = await gh.rawText(repo, mediaPath(folder, 'index.json'));
+    } catch (e) {
+      if (e instanceof GitHubError && e.kind === 'not_found') return { state: 'missing' };
+      throw e;
+    }
+    const r = parseMediaIndex(text);
+    return r.ok ? { state: 'ok', data: r.data } : { state: 'invalid', error: r.error };
+  }
+
+  /**
+   * 샘플 파일 한 개의 바이트. 캐시하지 않는다 — 몇 번 듣고 마는 파일이라 캐시 가치가 낮고,
+   * cache.mjs 는 글(문자열)을 담게 만들어져 있어서 바이너리를 넣으면 깨진다.
+   * @returns {Promise<ArrayBuffer>}
+   */
+  function mediaBytes(repo, folder, file) {
+    return gh.rawBytes(repo, mediaPath(folder, file));
+  }
+
+  /**
    * 할 일 파일. 캐시하지 않는다(폰과 /todo 가 함께 고치는 파일이라 늘 최신을 읽는다).
    * @returns {Promise<{state:'ok'|'missing', data:object, sha:string|null} | {state:'invalid', error:string}>}
    */
@@ -162,6 +188,8 @@ export function createStore({
     tasks,
     links,
     updateTasks,
+    mediaIndex,
+    mediaBytes,
     /** 토큰 지우기. 이후 도착하는 응답은 저장하지 않는다. */
     dispose() {
       disposed = true;

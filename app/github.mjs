@@ -6,6 +6,9 @@ import { TASKS_REPO, TASKS_PATH } from './todo.mjs';
 const API = 'https://api.github.com';
 const OWNER = '2giwon';
 
+/** 경로를 조각마다 인코딩한다. 슬래시는 그대로 둬야 contents API 가 하위 경로로 읽는다. */
+const encodePath = (path) => String(path).split('/').map(encodeURIComponent).join('/');
+
 /** 쓰기는 할 일 파일 한 곳만 허락한다(토큰이 쓰기 권한이라도 화면이 다른 문서를 고치지 않게, 11-11 결정) */
 const WRITABLE = new Set([`${TASKS_REPO}:${TASKS_PATH}`]);
 
@@ -91,6 +94,22 @@ export function createGitHub({ token, fetch }) {
       const list = await res.json();
       const date = list?.[0]?.commit?.committer?.date;
       return typeof date === 'string' ? date.slice(0, 10) : null;
+    },
+
+    /**
+     * 경로로 원문을 받는다. blob sha 를 몰라도 되므로 목록(catalog)에 없는 파일에 쓴다.
+     * raw 미디어 타입을 쓰는 이유: contents API 의 기본 base64 응답은 1MB 까지인데
+     * raw 는 100MB 까지 받는다. 나레이션 한 편(110초, 128k)이 약 1.7MB 라 base64 로는 모자란다.
+     */
+    async rawText(repo, path) {
+      const res = await request(`/repos/${OWNER}/${repo}/contents/${encodePath(path)}`, 'application/vnd.github.raw');
+      return res.text();
+    },
+
+    /** 같은 경로로 바이너리(음성, 영상, 이미지)를 받는다. 화면이 Blob 으로 감싸 재생한다. */
+    async rawBytes(repo, path) {
+      const res = await request(`/repos/${OWNER}/${repo}/contents/${encodePath(path)}`, 'application/vnd.github.raw');
+      return res.arrayBuffer();
     },
 
     /** 파일 글과 sha. 파일이 없으면 null. @returns {Promise<{text:string, sha:string}|null>} */

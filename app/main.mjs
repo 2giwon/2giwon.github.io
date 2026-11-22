@@ -16,12 +16,13 @@ function modules() {
     import('./screens/doc.mjs'),
     import('./screens/folders.mjs'),
     import('./cache.mjs'),
+    import('./screens/media.mjs'),
   ]);
 }
 
 async function render(force = false) {
   const seq = ++renderSeq;
-  const [dom, storeMod, tokenMod, dashMod, docMod, folderMod, cacheMod] = await modules();
+  const [dom, storeMod, tokenMod, dashMod, docMod, folderMod, cacheMod, mediaMod] = await modules();
   if (seq !== renderSeq) return;
   const { h, failure, errorText } = dom;
   const root = document.getElementById('app');
@@ -121,6 +122,7 @@ async function render(force = false) {
   (await import('./draw.mjs')).disposeDetachedCharts();
   if (route.name === 'doc') content.replaceChildren(docMod.docScreen(store, catalog, route.repo, route.path));
   else if (route.name === 'folders') content.replaceChildren(folderMod.foldersScreen(catalog, route.repo, route.folder));
+  else if (route.name === 'media') content.replaceChildren(mediaMod.mediaScreen(store, route.repo, route.folder));
   else content.replaceChildren(dashMod.dashboardScreen(store, catalog));
   window.scrollTo(0, 0);
 }
