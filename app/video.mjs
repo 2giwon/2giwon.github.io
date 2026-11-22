@@ -8,10 +8,10 @@ export const VIDEO_TASKS_PATH = 'video-pipeline/TASKS.md';
  * 나중에 클립과 앵커 이미지도 폴더를 하나 더 두는 식으로 붙인다.
  */
 export const VIDEO_SAMPLES = [
-  { label: '완성 나레이션 — 속도 고르기', folder: 'video-pipeline/media/final-test' },
-  { label: '모델 비교', folder: 'video-pipeline/media/model-test' },
-  { label: '목소리 고르기 (끝남, vivian 선택)', folder: 'video-pipeline/media/voice-test' },
-  { label: '말 속도 (한 문장)', folder: 'video-pipeline/media/speed-test' },
+  { label: '완성 나레이션 — 최종 고르기', folder: 'video-pipeline/media/final-test' },
+  { label: '쓸 모델 둘 (Ming, Qwen)', folder: 'video-pipeline/media/model-test' },
+  { label: 'Qwen 목소리 9종 (끝남, vivian 선택)', folder: 'video-pipeline/media/voice-test' },
+  { label: 'Qwen 말 속도 (한 문장)', folder: 'video-pipeline/media/speed-test' },
 ];
 
 /** `- [ ]` 의 가운데 글자 → 상태. TASKS.md 머리말에 적어 둔 규칙과 같다. */
