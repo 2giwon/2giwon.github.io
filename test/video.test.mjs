@@ -89,6 +89,22 @@ test('설명 안쪽의 굵게 표시도 떼어 낸다', () => {
   assert.match(t2.detail, /사용자 판정 대기/);
 });
 
+test('쪼갠 작업 번호(T2-1)도 읽는다', () => {
+  const r = parseTaskList('## 가\n\n- [~] **T2-1 목소리 9종 비교** — 생성 끝\n- [ ] **T2-2 말 속도**\n');
+  const [a, b] = r.groups[0].items;
+  assert.equal(a.id, 'T2-1');
+  assert.equal(a.title, '목소리 9종 비교');
+  assert.equal(b.id, 'T2-2');
+  assert.equal(b.title, '말 속도');
+});
+
+test('번호 모양이 아니면 전체를 제목으로 둔다', () => {
+  const r = parseTaskList('## 가\n\n- [ ] **번호 없는 작업**\n');
+  const it = r.groups[0].items[0];
+  assert.equal(it.id, null);
+  assert.equal(it.title, '번호 없는 작업');
+});
+
 test('설명이 없는 항목도 받는다', () => {
   const t6 = parseTaskList(MD).groups[2].items[0];
   assert.equal(t6.id, 'T6');

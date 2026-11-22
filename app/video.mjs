@@ -3,8 +3,14 @@
 
 export const VIDEO_REPO = 'personal-docs';
 export const VIDEO_TASKS_PATH = 'video-pipeline/TASKS.md';
-/** 샘플 폴더. 음성이 먼저 들어왔고 나중에 클립과 앵커 이미지도 같은 방식으로 붙인다. */
-export const VIDEO_SAMPLES = [{ label: '나레이션 샘플', folder: 'video-pipeline/media/voice-test' }];
+/**
+ * 샘플 묶음. 폴더마다 index.json 하나를 읽는다. 음성이 먼저 들어왔고
+ * 나중에 클립과 앵커 이미지도 폴더를 하나 더 두는 식으로 붙인다.
+ */
+export const VIDEO_SAMPLES = [
+  { label: '목소리 고르기', folder: 'video-pipeline/media/voice-test' },
+  { label: '말 속도', folder: 'video-pipeline/media/speed-test' },
+];
 
 /** `- [ ]` 의 가운데 글자 → 상태. TASKS.md 머리말에 적어 둔 규칙과 같다. */
 const STATUS = { ' ': 'todo', x: 'done', X: 'done', '~': 'doing', '!': 'blocked' };
@@ -23,9 +29,12 @@ function plain(s) {
     .trim();
 }
 
-/** `D1 소재 확정과 출처 검증` → { id:'D1', title:'소재 확정과 출처 검증' } */
+/**
+ * `D1 소재 확정과 출처 검증` → { id:'D1', title:'소재 확정과 출처 검증' }
+ * 쪼갠 작업은 `T2-1` 처럼 하이픈이 붙는다(11-22에 T2 를 T2-1, T2-2 로 나누면서 드러났다).
+ */
 function splitId(text) {
-  const m = /^([A-Z]\d+)\s+(.*)$/.exec(text);
+  const m = /^([A-Z]\d+(?:-\d+)*)\s+(.*)$/.exec(text);
   return m ? { id: m[1], title: m[2].trim() } : { id: null, title: text };
 }
 
