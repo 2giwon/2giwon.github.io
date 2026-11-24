@@ -1,5 +1,6 @@
 /* 작업노트 화면 모양. 폰 우선(360px 부터), 넓은 화면에서는 가운데 정렬. */
 
+/* 색. 아래 값이 밝은 화면 원래 값이다. 화면 코드는 색을 직접 적지 않고 이 변수만 쓴다 */
 :root {
   --bg: #f3f5f7;
   --surface: #ffffff;
@@ -13,7 +14,64 @@
   --warn: #bf8700;
   --risk: #cf222e;
   --info: #1f6feb;
+  --subtle: #f6f8fa;
+  --chip: #eef1f4;
+  --info-bg: #e8f1ff;
+  --info-ink: #0b3a82;
+  --risk-bg: #ffebe9;
+  --risk-ink: #82071e;
+  --ok-bg: #e6f4ea;
+  --ok-ink: #1a7f37;
+  --warn-bg: #fff4d6;
+  --warn-ink: #7a5400;
+  --banner-warn-bg: #fff8e1;
+  --banner-warn-ink: #6b4e00;
+  --hover-bg: #eff5ff;
+  --track: #e4e8ec;
+  --sk-a: #e9edf1;
+  --sk-b: #f4f6f8;
   --radius: 12px;
+}
+
+/* 다크모드(11-24): light-dark(밝은 값, 어두운 값). 기본은 기기 설정을 따르고,
+   위 막대 버튼으로 고르면 theme.mjs 가 <html data-theme> 를 붙여 고정한다.
+   light-dark() 를 모르는 브라우저(Safari 17.4 이하)는 이 블록을 건너뛰고 위 밝은 색으로 보인다.
+   감싸지 않으면 변수가 통째로 무효가 되어 밝은 화면에서도 색이 다 빠진다(codex P2 11-24) */
+@supports (color: light-dark(#000, #fff)) {
+  :root { color-scheme: light dark; }
+  :root[data-theme="light"] { color-scheme: light; }
+  :root[data-theme="dark"] { color-scheme: dark; }
+
+  :root {
+    --bg: light-dark(#f3f5f7, #0d1117);
+    --surface: light-dark(#ffffff, #161b22);
+    --ink: light-dark(#1b2733, #e6edf3);
+    --muted: light-dark(#66727f, #8d96a0);
+    --line: light-dark(#dde2e7, #30363d);
+    --brand: light-dark(#1f6feb, #4493f8);
+    --company: light-dark(#1f6feb, #4493f8);
+    --personal: light-dark(#e0823d, #f0883e);
+    --ok: light-dark(#2da44e, #3fb950);
+    --warn: light-dark(#bf8700, #d29922);
+    --risk: light-dark(#cf222e, #f85149);
+    --info: light-dark(#1f6feb, #4493f8);
+    --subtle: light-dark(#f6f8fa, #1c2128);
+    --chip: light-dark(#eef1f4, #262c36);
+    --info-bg: light-dark(#e8f1ff, #121d2f);
+    --info-ink: light-dark(#0b3a82, #79c0ff);
+    --risk-bg: light-dark(#ffebe9, #2d1517);
+    --risk-ink: light-dark(#82071e, #ffa198);
+    --ok-bg: light-dark(#e6f4ea, #12261e);
+    --ok-ink: light-dark(#1a7f37, #3fb950);
+    --warn-bg: light-dark(#fff4d6, #2e2410);
+    --warn-ink: light-dark(#7a5400, #d29922);
+    --banner-warn-bg: light-dark(#fff8e1, #2e2410);
+    --banner-warn-ink: light-dark(#6b4e00, #e3b341);
+    --hover-bg: light-dark(#eff5ff, #121d2f);
+    --track: light-dark(#e4e8ec, #262c36);
+    --sk-a: light-dark(#e9edf1, #21262d);
+    --sk-b: light-dark(#f4f6f8, #2b313a);
+  }
 }
 
 * { box-sizing: border-box; }
@@ -66,8 +124,8 @@ button.primary {
 .topbar .shortcut-error { font-size: 13px; color: var(--muted); }
 
 .banner { margin: 12px 0 0; padding: 10px 12px; border-radius: 8px; font-size: 14px; }
-.banner.warn { background: #fff8e1; color: #6b4e00; }
-.banner.info { background: #e8f1ff; color: #0b3a82; }
+.banner.warn { background: var(--banner-warn-bg); color: var(--banner-warn-ink); }
+.banner.info { background: var(--info-bg); color: var(--info-ink); }
 
 /* 묶음과 카드 */
 .group > h2 { display: flex; align-items: center; gap: 8px; }
@@ -99,11 +157,11 @@ button.primary {
 
 .badge {
   display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px;
-  margin-left: 6px; vertical-align: middle; background: #eef1f4; color: var(--muted);
+  margin-left: 6px; vertical-align: middle; background: var(--chip); color: var(--muted);
 }
-.badge.ok { background: #e6f4ea; color: #1a7f37; }
-.badge.warn { background: #fff4d6; color: #7a5400; }
-.badge.muted { background: #eef1f4; color: var(--muted); }
+.badge.ok { background: var(--ok-bg); color: var(--ok-ink); }
+.badge.warn { background: var(--warn-bg); color: var(--warn-ink); }
+.badge.muted { background: var(--chip); color: var(--muted); }
 
 .muted { color: var(--muted); font-size: 13px; margin: 0; }
 
@@ -127,10 +185,10 @@ button.primary {
 .today-title { display: block; overflow-wrap: anywhere; }
 .today-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 2px; font-size: 12px; color: var(--muted); }
 .today-meta .badge { margin-left: 0; }
-.badge.stage.urgent, .badge.risk { background: #ffebe9; color: var(--risk); }
-.badge.stage.relaxed { background: #eef1f4; color: var(--muted); }
-.badge.stage.normal { background: #e8f1ff; color: #0b3a82; }
-.badge.ticket { background: #e8f1ff; color: var(--brand); }
+.badge.stage.urgent, .badge.risk { background: var(--risk-bg); color: var(--risk); }
+.badge.stage.relaxed { background: var(--chip); color: var(--muted); }
+.badge.stage.normal { background: var(--info-bg); color: var(--info-ink); }
+.badge.ticket { background: var(--info-bg); color: var(--brand); }
 .today-project { overflow-wrap: anywhere; }
 .today-actions { grid-column: 2; display: flex; align-items: center; gap: 12px; font-size: 13px; }
 .today-actions select, .today-add select { font: inherit; font-size: 13px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
@@ -183,16 +241,16 @@ button.primary {
 .fig-chart-pie { height: 260px; }
 .fig-cards { display: grid; gap: 8px; grid-template-columns: 1fr; }
 @media (min-width: 520px) { .fig-cards { grid-template-columns: 1fr 1fr; } }
-.fig-card { border-radius: 10px; padding: 10px 12px; background: #f6f8fa; border-left: 4px solid var(--info); }
+.fig-card { border-radius: 10px; padding: 10px 12px; background: var(--subtle); border-left: 4px solid var(--info); }
 .fig-card p { margin: 4px 0 0; font-size: 14px; }
 .fig-card.tone-ok { border-color: var(--ok); }
 .fig-card.tone-warn { border-color: var(--warn); }
 .fig-card.tone-risk { border-color: var(--risk); }
 .fig-table table, .prose table { border-collapse: collapse; width: 100%; font-size: 13px; }
 .fig-table th, .fig-table td, .prose th, .prose td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
-.fig-table th, .prose th { background: #f6f8fa; }
+.fig-table th, .prose th { background: var(--subtle); }
 .progress-row { display: grid; grid-template-columns: minmax(0, 1fr) 40% auto; align-items: center; gap: 8px; margin: 6px 0; font-size: 14px; }
-.progress-bar { height: 10px; background: #eef1f4; border-radius: 999px; overflow: hidden; }
+.progress-bar { height: 10px; background: var(--chip); border-radius: 999px; overflow: hidden; }
 .progress-bar span { display: block; height: 100%; background: var(--ok); }
 .progress-num { font-size: 12px; color: var(--muted); }
 .key-points { margin: 12px 0 0; padding-left: 20px; font-weight: 500; }
@@ -200,8 +258,8 @@ button.primary {
 .original { margin-top: 12px; }
 .original summary { cursor: pointer; color: var(--muted); font-size: 13px; }
 .prose { font-size: 14px; overflow-wrap: anywhere; }
-.prose pre { overflow-x: auto; background: #f6f8fa; padding: 10px; border-radius: 8px; font-size: 12px; }
-.prose code { font-size: 12.5px; background: #f6f8fa; padding: 1px 4px; border-radius: 4px; }
+.prose pre { overflow-x: auto; background: var(--subtle); padding: 10px; border-radius: 8px; font-size: 12px; }
+.prose code { font-size: 12.5px; background: var(--subtle); padding: 1px 4px; border-radius: 4px; }
 .prose pre code { padding: 0; background: none; }
 .prose .table-wrap, .prose table { display: block; overflow-x: auto; }
 .prose blockquote { margin: 8px 0; padding: 4px 12px; border-left: 3px solid var(--line); color: var(--muted); }
@@ -228,16 +286,16 @@ button.primary {
 .skeleton { display: grid; gap: 8px; }
 .skeleton span {
   display: block; height: 14px; border-radius: 6px;
-  background: linear-gradient(90deg, #e9edf1 25%, #f4f6f8 50%, #e9edf1 75%);
+  background: linear-gradient(90deg, var(--sk-a) 25%, var(--sk-b) 50%, var(--sk-a) 75%);
   background-size: 200% 100%; animation: shimmer 1.2s infinite linear;
 }
 .skeleton span:nth-child(odd) { width: 85%; }
 .title-skeleton span { height: 22px; }
 .chart-skeleton span, .fig-skeleton { height: 200px; }
-.fig-skeleton { border-radius: 8px; background: #eef1f4; }
+.fig-skeleton { border-radius: 8px; background: var(--chip); }
 @keyframes shimmer { to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .skeleton span { animation: none; } }
-.failure { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding: 10px 12px; border-radius: 8px; background: #ffebe9; color: #82071e; font-size: 14px; }
+.failure { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding: 10px 12px; border-radius: 8px; background: var(--risk-bg); color: var(--risk-ink); font-size: 14px; }
 .empty { padding: 12px; color: var(--muted); font-size: 14px; text-align: center; background: var(--surface); border: 1px dashed var(--line); border-radius: 8px; }
 
 /* 샘플 화면(11-22). 같은 문장을 모델과 설정만 바꿔 만든 음성을 나란히 듣고 고른다 */
@@ -259,7 +317,7 @@ button.primary {
 .media-slot { min-height: 40px; display: flex; align-items: center; }
 .media-skeleton span { height: 32px; }
 .media-play { border: 1px solid var(--brand); background: var(--surface); color: var(--brand); border-radius: 8px; padding: 8px 16px; font-size: 14px; cursor: pointer; }
-.media-play:hover { background: #eff5ff; }
+.media-play:hover { background: var(--hover-bg); }
 .media-audio { width: 100%; height: 36px; }
 .media-video, .media-img { width: 100%; max-height: 420px; border-radius: 8px; background: #000; }
 .media-img { object-fit: contain; }
@@ -282,7 +340,7 @@ button.primary {
 .vp-card-open { display: inline-block; margin-top: 10px; font-size: 14px; font-weight: 600; }
 
 .vp-progress { margin: 0; }
-.vp-bar { height: 8px; border-radius: 999px; background: #e4e8ec; overflow: hidden; }
+.vp-bar { height: 8px; border-radius: 999px; background: var(--track); overflow: hidden; }
 .vp-bar span { display: block; height: 100%; background: var(--ok); border-radius: 999px; }
 .vp-progress-text { margin: 6px 0 0; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
 

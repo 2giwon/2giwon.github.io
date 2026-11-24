@@ -2,14 +2,63 @@
 // Mermaid, Chart.js 는 index.html 이 vendor 파일로 불러 둔 전역(window.mermaid, window.Chart)이다.
 
 import { h, failure } from './dom.mjs';
+import { currentTheme, figureColors } from './theme.mjs';
 
-let mermaidReady = false;
+let mermaidTheme = null; // 마지막으로 initialize 한 흐름도 테마(다크모드 11-24)
 let seq = 0;
 // Chart.js 는 만든 그래프를 전역에 붙잡아 둔다. 화면을 바꿀 때 떨어져 나간 그래프를 정리한다(codex P2 11-09)
 const charts = new Set();
+// 화면에 그린 흐름도. 화면 밝기가 바뀌면 그 자리에서 다시 그린다(흐름도는 색만 바꿀 수 없다)
+const mermaidBoxes = new Map();
+
+/** 그래프 글자색, 격자선을 지금 화면 밝기에 맞춘다. 이미 그린 그래프는 update() 때 다시 읽는다. */
+function applyChartColors() {
+  const Chart = globalThis.Chart;
+  if (!Chart) return;
+  const c = figureColors(currentTheme());
+  Chart.defaults.color = c.text;
+  Chart.defaults.borderColor = c.grid;
+}
 
 function makeChart(canvas, config) {
+  applyChartColors();
   charts.add(new globalThis.Chart(canvas, config));
+}
+
+/**
+ * 이미 그린 그래프의 색을 바꾼다. Chart.js 는 만들 때 색을 그래프 안에 담아 두어서
+ * 기본값만 바꾸고 update() 해도 예전 색이 남는다(11-24 실화면: 밝게로 바꾸자 격자선이 사라짐).
+ */
+export function recolorChart(chart, colors) {
+  const o = chart.options;
+  o.color = colors.text;
+  for (const s of Object.values(o.scales ?? {})) {
+    if (s.ticks) s.ticks.color = colors.text;
+    if (s.grid) s.grid.color = colors.grid;
+    if (s.border) s.border.color = colors.grid;
+  }
+  if (o.plugins?.legend?.labels) o.plugins.legend.labels.color = colors.text;
+  if (chart.config.type === 'pie') for (const d of chart.data.datasets) d.borderColor = colors.pieBorder;
+  chart.update('none');
+}
+
+/** 화면 밝기가 바뀌었을 때 부른다. 화면 전체를 다시 그리지 않아서 읽던 위치가 그대로다. */
+export async function redrawForTheme() {
+  disposeDetachedCharts();
+  applyChartColors();
+  const colors = figureColors(currentTheme());
+  for (const c of charts) recolorChart(c, colors);
+  for (const [box, f] of mermaidBoxes) {
+    if (!box.isConnected) {
+      mermaidBoxes.delete(box);
+      continue;
+    }
+    try {
+      await drawMermaid(box, f);
+    } catch (e) {
+      console.warn('[worknote] 흐름도 다시 그리기 실패', e);
+    }
+  }
 }
 
 /** 화면에서 떨어져 나간 그래프를 정리한다. 화면을 바꿀 때마다 부른다. */
@@ -20,6 +69,7 @@ export function disposeDetachedCharts() {
       charts.delete(c);
     }
   }
+  for (const box of mermaidBoxes.keys()) if (!box.isConnected) mermaidBoxes.delete(box);
 }
 
 let mermaidLoading = null;
@@ -46,17 +96,24 @@ async function ensureMermaid() {
   await loadMermaid();
   const m = globalThis.mermaid;
   if (!m) throw new Error('Mermaid 를 불러오지 못했습니다');
-  if (!mermaidReady) {
-    m.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'neutral', suppressErrorRendering: true });
-    mermaidReady = true;
+  const theme = figureColors(currentTheme()).mermaid;
+  if (mermaidTheme !== theme) {
+    m.initialize({ startOnLoad: false, securityLevel: 'strict', theme, suppressErrorRendering: true });
+    mermaidTheme = theme;
   }
   return m;
 }
 
 const PALETTE = ['#1f6feb', '#e0823d', '#2da44e', '#a371f7', '#cf222e', '#6e7781'];
 
+// 흐름도 자리마다 마지막으로 시작한 그리기 번호. 늦게 끝난 예전 그림이 새 테마 그림을 덮지 않게 거른다
+const latestDraw = new WeakMap();
+
 async function drawMermaid(box, f) {
   const id = `mmd-${++seq}`;
+  // 그리기 시작할 때 등록해야 그리는 도중에 화면 밝기가 바뀌어도 redrawForTheme 가 이 자리를 찾는다(codex P2 11-24)
+  mermaidBoxes.set(box, f);
+  latestDraw.set(box, id);
   // Mermaid 가 그리는 동안 body 에 임시 요소를 남길 수 있다. 결과 svg 도 같은 id 를 쓰므로
   // 반드시 임시 요소를 먼저 치운 뒤 결과를 넣는다(순서가 바뀌면 방금 넣은 그림이 지워진다).
   const cleanup = () => {
@@ -69,6 +126,7 @@ async function drawMermaid(box, f) {
   } finally {
     cleanup();
   }
+  if (latestDraw.get(box) !== id) return; // 더 새로 시작한 그리기가 있다
   box.replaceChildren(h('div', { class: 'fig-mermaid', html: svg }));
 }
 
@@ -86,7 +144,7 @@ function drawChart(box, f) {
         label: s.name,
         data: s.values,
         backgroundColor: pie ? f.labels.map((_, j) => PALETTE[j % PALETTE.length]) : PALETTE[i % PALETTE.length],
-        borderColor: pie ? '#fff' : PALETTE[i % PALETTE.length],
+        borderColor: pie ? figureColors(currentTheme()).pieBorder : PALETTE[i % PALETTE.length],
       })),
     },
     options: {

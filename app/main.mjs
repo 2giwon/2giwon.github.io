@@ -3,6 +3,7 @@
 
 import { loadToken, clearToken, expiryStatus } from './token.mjs';
 import { parseRoute } from './route.mjs';
+import { initTheme, onThemeChange, cycleChoice, currentChoice, choiceLabel, themeSupported } from './theme.mjs';
 
 let store = null;
 let renderSeq = 0; // 늦게 끝난 이전 그리기가 지금 화면을 덮지 않게 순번으로 거른다
@@ -79,6 +80,7 @@ async function render(force = false) {
       shortcuts,
       h('a', { href: '#/folders' }, '폴더'),
       h('button', { type: 'button', class: 'link', onclick: () => void go(true) }, '새로 고침'),
+      themeButton(h),
       clearBtn
     ),
     banners,
@@ -129,6 +131,18 @@ async function render(force = false) {
   window.scrollTo(0, 0);
 }
 
+/** 화면 밝기 버튼. 누를 때마다 자동, 밝게, 어둡게 순서로 바뀐다(11-24). */
+function themeButton(h) {
+  if (!themeSupported()) return null; // 다크모드를 못 그리는 브라우저에서는 눌러도 바뀌는 것이 없다
+  const btn = h('button', { type: 'button', class: 'link', 'aria-label': `${choiceLabel(currentChoice())} (눌러서 바꾸기)` }, choiceLabel(currentChoice()));
+  btn.addEventListener('click', () => {
+    const label = choiceLabel(cycleChoice());
+    btn.textContent = label;
+    btn.setAttribute('aria-label', `${label} (눌러서 바꾸기)`);
+  });
+  return btn;
+}
+
 function go(force = false) {
   return render(force).catch((e) => {
     console.error('[worknote]', e);
@@ -137,6 +151,9 @@ function go(force = false) {
 }
 
 export function start() {
+  initTheme();
+  // 그림만 다시 칠한다. 흐름도 도구는 문서를 연 적이 있을 때만 받아져 있다
+  onThemeChange(() => void import('./draw.mjs').then((d) => d.redrawForTheme()));
   window.addEventListener('hashchange', () => void go());
   void go();
 }
