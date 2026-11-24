@@ -4,6 +4,7 @@
 import { loadToken, clearToken, expiryStatus } from './token.mjs';
 import { parseRoute } from './route.mjs';
 import { initTheme, onThemeChange, cycleChoice, currentChoice, choiceLabel, themeSupported } from './theme.mjs';
+import { iconSvg, themeIconName } from './icons.mjs';
 
 let store = null;
 let renderSeq = 0; // 늦게 끝난 이전 그리기가 지금 화면을 덮지 않게 순번으로 거른다
@@ -49,11 +50,14 @@ async function render(force = false) {
   if (!store) store = storeMod.createStore({ token: tokenInfo.token });
 
   let confirmClear = false;
-  const clearBtn = h('button', { type: 'button', class: 'link danger' }, '토큰 지우기');
+  const clearBtn = iconButton(h, { icon: 'key-off', label: '토큰 지우기', danger: true });
+  // 첫 번째로 누르면 아이콘 옆에 안내를 띄우고, 한 번 더 눌러야 지운다
+  const clearHint = h('span', { class: 'clear-hint', role: 'status' });
   clearBtn.addEventListener('click', async () => {
     if (!confirmClear) {
       confirmClear = true;
-      clearBtn.textContent = '한 번 더 누르면 토큰과 저장한 문서를 지웁니다';
+      clearHint.textContent = '한 번 더 누르면 토큰과 저장한 문서를 지웁니다';
+      clearBtn.setAttribute('aria-label', '토큰 지우기 확인(한 번 더 누르면 지웁니다)');
       return;
     }
     store?.dispose(); // 아직 오고 있는 응답이 지운 뒤에 다시 저장되지 않게 먼저 막는다
@@ -78,10 +82,15 @@ async function render(force = false) {
       { class: 'topbar' },
       h('a', { class: 'brand', href: '#/' }, '작업노트'),
       shortcuts,
-      h('a', { href: '#/folders' }, '폴더'),
-      h('button', { type: 'button', class: 'link', onclick: () => void go(true) }, '새로 고침'),
-      themeButton(h),
-      clearBtn
+      h(
+        'span',
+        { class: 'tools' },
+        iconButton(h, { icon: 'folder', label: '폴더', href: '#/folders' }),
+        iconButton(h, { icon: 'refresh', label: '새로 고침', onclick: () => void go(true) }),
+        themeButton(h),
+        clearBtn,
+        clearHint
+      )
     ),
     banners,
     content
@@ -134,13 +143,27 @@ async function render(force = false) {
 /** 화면 밝기 버튼. 누를 때마다 자동, 밝게, 어둡게 순서로 바뀐다(11-24). */
 function themeButton(h) {
   if (!themeSupported()) return null; // 다크모드를 못 그리는 브라우저에서는 눌러도 바뀌는 것이 없다
-  const btn = h('button', { type: 'button', class: 'link', 'aria-label': `${choiceLabel(currentChoice())} (눌러서 바꾸기)` }, choiceLabel(currentChoice()));
+  const choice = currentChoice();
+  const btn = iconButton(h, { icon: themeIconName(choice), label: `${choiceLabel(choice)} (눌러서 바꾸기)` });
   btn.addEventListener('click', () => {
-    const label = choiceLabel(cycleChoice());
-    btn.textContent = label;
-    btn.setAttribute('aria-label', `${label} (눌러서 바꾸기)`);
+    const next = cycleChoice();
+    setIcon(btn, themeIconName(next), `${choiceLabel(next)} (눌러서 바꾸기)`);
   });
   return btn;
+}
+
+/** 위 막대 아이콘 버튼(11-24). 글자 대신 아이콘, 이름은 마우스를 올리면 보이고 화면 읽기 프로그램이 읽는다. */
+function iconButton(h, { icon, label, href, onclick, danger = false }) {
+  const cls = `icon-btn${danger ? ' danger' : ''}`;
+  const el = href ? h('a', { class: cls, href }) : h('button', { type: 'button', class: cls, onclick });
+  setIcon(el, icon, label);
+  return el;
+}
+
+function setIcon(el, icon, label) {
+  el.innerHTML = iconSvg(icon); // 이 파일이 만든 고정 SVG 만 넣는다
+  el.title = label;
+  el.setAttribute('aria-label', label);
 }
 
 function go(force = false) {
