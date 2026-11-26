@@ -15,6 +15,14 @@ test('B1. 평일 17:00~18:00 은 자동(30초마다), 18:00 뒤는 버튼, 17:00
   assert.equal(commuteMode(at(17, 30, 29)), 'hidden'); // 일요일
 });
 
+test('B7. 테스트 스위치(주소의 ?commute=auto|manual)는 시각과 상관없이 그 모드로, 다른 값은 무시', () => {
+  assert.equal(commuteMode(at(9, 0), 'auto'), 'auto');
+  assert.equal(commuteMode(at(9, 0, 28), 'manual'), 'manual'); // 토요일 아침이어도
+  assert.equal(commuteMode(at(9, 0), 'hidden'), 'hidden');
+  assert.equal(commuteMode(at(9, 0), 'xyz'), 'hidden'); // 모르는 값은 무시하고 시각대로
+  assert.equal(commuteMode(at(17, 30), null), 'auto');
+});
+
 test('B2. 도착 정보는 traTime(초)으로 읽고, 운행종료나 출발대기는 모름(null)', () => {
   assert.equal(busSeconds('2분38초후[1번째 전]', '158'), 158);
   assert.equal(busSeconds('곧 도착', '5'), 5);

@@ -23,8 +23,14 @@ export const ROUTE = {
 
 const MIN = 60_000;
 
-/** 평일 17:00~18:00 자동(30초마다), 18:00 뒤 버튼, 17:00 전과 주말은 숨김(사용자 결정 11-26) */
-export function commuteMode(now) {
+const MODES = ['auto', 'manual', 'hidden'];
+
+/**
+ * 평일 17:00~18:00 자동(30초마다), 18:00 뒤 버튼, 17:00 전과 주말은 숨김(사용자 결정 11-26).
+ * forced: 테스트 스위치. 주소에 ?commute=auto 나 ?commute=manual 을 붙이면 시각과 상관없이 그 모드(11-27 사용자 요청)
+ */
+export function commuteMode(now, forced = null) {
+  if (MODES.includes(forced)) return forced;
   const day = now.getDay();
   if (day === 0 || day === 6) return 'hidden';
   const t = now.getHours() * 60 + now.getMinutes();

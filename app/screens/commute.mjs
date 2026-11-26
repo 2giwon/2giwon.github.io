@@ -9,6 +9,9 @@ import { h, skeleton, failure } from '../dom.mjs';
 import { BUS_API, commuteMode, catchableBus, homePlan, badgeText, waitText, ROUTE } from '../commute.mjs';
 
 const TICK_MS = 30_000;
+/** 테스트 스위치: 주소에 ?commute=auto 나 ?commute=manual 을 붙이면 시각과 상관없이 보인다(11-27) */
+const FORCED = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('commute') : null;
+const modeAt = (d) => commuteMode(d, FORCED);
 const hhmm = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
 /** Worker 에서 받는다. 실패하면 이유를 담아 throw */
@@ -117,7 +120,7 @@ export function commuteBadge() {
         { class: 'cm-foot' },
         h('span', null, `${hhmm(new Date(data?.fetchedAt ?? now))} 기준, 회사 앞 정류장`),
         // 18:00 뒤에는 자동으로 받지 않으니 다시 받는 버튼을 둔다
-        commuteMode(now) === 'manual' ? h('button', { type: 'button', class: 'cm-check', onclick: () => void load(true) }, '다시 확인') : null
+        modeAt(now) === 'manual' ? h('button', { type: 'button', class: 'cm-check', onclick: () => void load(true) }, '다시 확인') : null
       ),
     ];
   }
@@ -151,7 +154,7 @@ export function commuteBadge() {
   }
 
   function tick() {
-    const mode = commuteMode(new Date());
+    const mode = modeAt(new Date());
     wrap.hidden = mode === 'hidden';
     if (mode === 'hidden') {
       setOpen(false);
@@ -183,7 +186,7 @@ export function commuteBadge() {
     if (!gone()) tick();
   }, TICK_MS);
   const onVisible = () => {
-    if (!gone() && !document.hidden && commuteMode(new Date()) === 'auto') void load();
+    if (!gone() && !document.hidden && modeAt(new Date()) === 'auto') void load();
   };
   document.addEventListener('visibilitychange', onVisible);
   setTimeout(gone, 0);
