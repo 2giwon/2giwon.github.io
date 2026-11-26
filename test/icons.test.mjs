@@ -17,6 +17,10 @@ test('아이콘은 화면 읽기 프로그램이 건너뛰는 24칸 SVG 이고, 
   }
 });
 
+test('귀가편 그림 타일용 버스, 지하철 그림이 있다(11-27)', () => {
+  for (const name of ['bus', 'subway']) assert.ok(ICONS[name], name);
+});
+
 test('모르는 아이콘 이름이면 빈 글자를 돌려준다(화면이 깨지지 않게)', () => {
   assert.equal(iconSvg('nope'), '');
 });

@@ -9,7 +9,7 @@ const STOP_ORD = '80'; // 이촌동두산위브트레지움.한강대우아파�
 const NODEUL_ORD = '83'; // 노들역(20014)
 const ALLOWED = ['https://2giwon.github.io', 'http://localhost:5300', 'http://127.0.0.1:5300'];
 const CACHE_SEC = 20;
-const FIELDS = ['stNm', 'arsId', 'arrmsg1', 'arrmsg2', 'traTime1', 'traTime2', 'vehId1', 'vehId2'];
+const FIELDS = ['stNm', 'arsId', 'arrmsg1', 'arrmsg2', 'traTime1', 'traTime2', 'vehId1', 'vehId2', 'mkTm'];
 
 let recent = null; // { at, body } 최근 결과(20초)
 
@@ -51,8 +51,11 @@ export default {
       return json({ error: data?.msgHeader?.headerMsg ?? data?.message ?? '서울시 API 오류' }, 502, cors);
     }
     const items = data?.msgBody?.itemList ?? [];
+    const stopItem = items.find((i) => String(i.staOrd) === STOP_ORD);
     const body = {
       fetchedAt: new Date().toISOString(),
+      // 서울시가 이 도착 예측을 만든 시각(한국 시각). 화면이 이 시각부터 지난 만큼 남은 시간을 줄인다(11-27)
+      mkTm: stopItem?.mkTm ?? null,
       stop: pick(items.find((i) => String(i.staOrd) === STOP_ORD)),
       nodeul: pick(items.find((i) => String(i.staOrd) === NODEUL_ORD)),
     };

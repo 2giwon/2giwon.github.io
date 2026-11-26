@@ -695,21 +695,41 @@ button.primary {
 /* 귀가편 6211(#163 11-27): 시계 옆 추천 알약 + 드롭다운. 알약은 추천 경로의 노선 색(지선버스 초록, 4호선 하늘색) */
 .cm { --bus: #2fbf5b; --subway: #00a5de; position: relative; align-self: center; }
 .cm[hidden] { display: none; }
-.cm-pill {
-  display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 16px; border: 0; border-radius: 999px;
-  font: inherit; font-size: 14px; font-weight: 800; letter-spacing: -0.01em; white-space: nowrap; cursor: pointer;
-  box-shadow: 0 6px 18px -8px rgba(0, 0, 0, .6);
+/* 그림 타일(11-27): 공항 안내 표지 같은 정사각형. 버스는 지선버스 초록, 지하철은 4호선 하늘색. 구석 배지는 남은 분, ?, ! */
+.cm-tile {
+  position: relative; display: inline-grid; place-items: center; width: 52px; height: 52px; padding: 0; border: 0; border-radius: 12px;
+  font: inherit; cursor: pointer; box-shadow: 0 6px 18px -8px rgba(0, 0, 0, .6);
 }
-.cm-pill.bus { background: var(--bus); color: #04230f; box-shadow: 0 0 0 3px color-mix(in srgb, var(--bus) 35%, transparent), 0 6px 18px -6px var(--bus); }
-.cm-pill.subway { background: var(--subway); color: #fff; box-shadow: 0 0 0 3px color-mix(in srgb, var(--subway) 35%, transparent), 0 6px 18px -6px var(--subway); }
-.cm-pill.manual { background: var(--board); color: var(--flap); box-shadow: inset 0 0 0 2px var(--flap); }
-.cm-pill.fail { background: var(--board); color: #ff8a80; box-shadow: inset 0 0 0 2px #ff5a4f; }
-.cm-pill.loading { width: 190px; background: color-mix(in srgb, var(--board-muted) 35%, transparent); box-shadow: none; animation: cm-shimmer 1.2s ease-in-out infinite; cursor: default; }
-.cm-pill.hurry { animation: cm-pulse 1.1s ease-in-out infinite; }
-.cm-pill:focus-visible { outline: 2px solid var(--flap); outline-offset: 3px; }
-@keyframes cm-pulse { 50% { transform: scale(1.04); filter: brightness(1.15); } }
+.cm-icon svg { width: 32px; height: 32px; stroke-width: 2.2; }
+.cm-tile.bus { background: var(--bus); color: #04230f; box-shadow: 0 0 0 3px color-mix(in srgb, var(--bus) 35%, transparent), 0 6px 18px -6px var(--bus); }
+.cm-tile.subway { background: var(--subway); color: #fff; box-shadow: 0 0 0 3px color-mix(in srgb, var(--subway) 35%, transparent), 0 6px 18px -6px var(--subway); }
+.cm-tile.manual { background: var(--board); color: var(--board-muted); box-shadow: inset 0 0 0 2px var(--board-muted); }
+.cm-tile.fail { background: var(--board); color: #ff8a80; box-shadow: inset 0 0 0 2px #ff5a4f; }
+.cm-tile.loading { background: color-mix(in srgb, var(--board-muted) 35%, transparent); color: transparent; box-shadow: none; animation: cm-shimmer 1.2s ease-in-out infinite; cursor: default; }
+.cm-badge {
+  position: absolute; right: -8px; bottom: -6px; min-width: 22px; padding: 2px 6px; border-radius: 999px;
+  background: var(--board); color: var(--flap); font-family: var(--mono); font-size: 12px; font-weight: 800; line-height: 1.2;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.cm-badge[hidden] { display: none; }
+.cm-tile.fail .cm-badge { background: #ff5a4f; color: #fff; }
+.cm-tile.manual .cm-badge { color: var(--ink); background: var(--chip); }
+.cm-tile.hurry .cm-icon { animation: cm-bounce .7s ease-in-out infinite; }
+.cm-tile:focus-visible { outline: 2px solid var(--flap); outline-offset: 3px; }
+@keyframes cm-bounce { 50% { transform: translateY(-3px); } }
 @keyframes cm-shimmer { 50% { opacity: .45; } }
-@media (prefers-reduced-motion: reduce) { .cm-pill.hurry, .cm-pill.loading { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .cm-tile.hurry .cm-icon, .cm-tile.loading { animation: none; } }
+.cm-summary { margin: 0 0 6px; font-size: 17px; font-weight: 800; }
+.cm-buses { list-style: none; margin: 8px 0 10px; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.cm-buses li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding: 6px 8px; border-radius: 8px; }
+.cm-buses li.chosen { background: color-mix(in srgb, var(--bus) 18%, transparent); }
+.cm-bus-name { color: var(--muted); min-width: 56px; }
+.cm-buses b { font-family: var(--mono); }
+.cm-tag { margin-left: auto; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.cm-tag.go { background: var(--bus); color: #04230f; }
+.cm-tag.miss { background: var(--chip); color: var(--muted); }
+.cm-tag.if { background: var(--chip); color: var(--ink); }
+.cm-stale { color: var(--risk-ink); font-weight: 700; }
 .cm-drop {
   position: absolute; top: calc(100% + 8px); right: 0; z-index: 30; width: 320px; padding: 14px; border-radius: 12px;
   background: var(--surface); color: var(--ink); border: 1px solid var(--line); box-shadow: 0 18px 40px -16px rgba(0, 0, 0, .7);
@@ -717,8 +737,6 @@ button.primary {
 .cm-drop[hidden] { display: none; }
 /* 알약과 드롭다운 사이 8px 틈을 메우는 보이지 않는 다리. 마우스가 틈을 지나는 동안 닫히지 않게(codex P2 11-27) */
 .cm-drop::before { content: ''; position: absolute; left: 0; right: 0; top: -10px; height: 10px; }
-.cm-lead { display: flex; flex-direction: column; gap: 2px; margin: 0 0 10px; font-size: 13px; color: var(--muted); }
-.cm-lead strong { font-size: 20px; color: var(--ink); }
 .cm-hurry { color: var(--risk-ink); font-weight: 700; }
 .cm-rows { display: flex; flex-direction: column; gap: 6px; }
 .cm-row { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; padding: 8px 10px; border-radius: 8px; background: var(--chip); font-size: 13px; }

@@ -18,6 +18,12 @@ export const ICONS = {
   // Claude 테마: 물감 팔레트(상태판 테마 배너, 11-26)
   palette:
     '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.9 1.8-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4c0-4.4-4-8-9-8z"/><circle cx="7.5" cy="11" r="1" fill="currentColor"/><circle cx="10" cy="7" r="1" fill="currentColor"/><circle cx="14.5" cy="7" r="1" fill="currentColor"/><circle cx="17" cy="10.5" r="1" fill="currentColor"/>',
+  // 귀가편 그림 타일(11-27): 버스 앞모습(앞유리, 전조등, 바퀴)
+  bus:
+    '<rect x="5" y="3" width="14" height="16" rx="3"/><path d="M5 11h14"/><path d="M8 3.5h8"/><circle cx="8.5" cy="15" r="1" fill="currentColor"/><circle cx="15.5" cy="15" r="1" fill="currentColor"/><path d="M7.5 19v2M16.5 19v2"/>',
+  // 귀가편 그림 타일(11-27): 지하철 앞모습(창 두 개, 전조등, 선로)
+  subway:
+    '<rect x="5" y="3" width="14" height="15" rx="4"/><rect x="8" y="6" width="3" height="4" rx="1"/><rect x="13" y="6" width="3" height="4" rx="1"/><circle cx="8.5" cy="14" r="1" fill="currentColor"/><circle cx="15.5" cy="14" r="1" fill="currentColor"/><path d="M8 18l-2 3M16 18l2 3M7 21h10"/>',
 };
 
 /** 아이콘 SVG 글자. 모르는 이름이면 빈 글자(화면이 깨지지 않게). */

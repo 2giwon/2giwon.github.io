@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { commuteMode, busSeconds, catchableBus, homePlan, badgeText, ROUTE } from '../app/commute.mjs';
+import { commuteMode, busSeconds, catchableBus, homePlan, badgeText, dataAgeSec, busList, staleText, ROUTE } from '../app/commute.mjs';
 
 // 2026-11-26 은 목요일
 const at = (h, m, day = 26) => new Date(2026, 10, day, h, m, 0);
@@ -21,6 +21,37 @@ test('B7. 테스트 스위치(주소의 ?commute=auto|manual)는 시각과 상�
   assert.equal(commuteMode(at(9, 0), 'hidden'), 'hidden');
   assert.equal(commuteMode(at(9, 0), 'xyz'), 'hidden'); // 모르는 값은 무시하고 시각대로
   assert.equal(commuteMode(at(17, 30), null), 'auto');
+});
+
+test('B8. 지난 시간은 서울시가 정보를 만든 시각(mkTm, 한국 시각)부터 잰다. 없으면 Worker 가 받은 시각', () => {
+  // 시간대를 직접 적는다. GitHub 자동 검사는 UTC 라 기기 시간대로 만들면 깨진다(codex P2 11-27)
+  const now = new Date('2026-11-27T17:10:30+09:00');
+  assert.equal(dataAgeSec({ mkTm: '2026-11-27 17:10:00.0', fetchedAt: '2026-11-27T17:10:20+09:00' }, now), 30);
+  assert.equal(dataAgeSec({ fetchedAt: '2026-11-27T17:10:20+09:00' }, now), 10);
+  assert.equal(dataAgeSec({ mkTm: '깨진 값' }, now), 0);
+  assert.equal(dataAgeSec({ mkTm: '2026-11-27 17:11:00.0' }, now), 0); // 시계가 어긋나 미래면 0
+  assert.equal(dataAgeSec({ mkTm: '2026-11-27 08:10:00.0' }, new Date('2026-11-27T08:10:05+09:00')), 5); // 아침도
+});
+
+test('B9. 이번 버스와 다음 버스: 지난 시간만큼 줄인 남은 초와, 걸어가서 탈 수 있는지', () => {
+  const stopData = { arrmsg1: 'x', traTime1: '200', arrmsg2: 'y', traTime2: '900' };
+  assert.deepEqual(busList(stopData, 30), [
+    { order: 1, sec: 170, catchable: false, gone: false },
+    { order: 2, sec: 870, catchable: true, gone: false },
+  ]);
+  assert.deepEqual(busList({ arrmsg1: '운행종료', traTime1: '0', arrmsg2: '', traTime2: '' }, 0), [
+    { order: 1, sec: null, catchable: false, gone: false },
+    { order: 2, sec: null, catchable: false, gone: false },
+  ]);
+  // 예측 시각이 지났으면 "1분 안에"로 남기지 않고 지나갔을 수 있다고 표시한다(codex P2 11-27)
+  assert.deepEqual(busList({ arrmsg1: 'x', traTime1: '20' }, 60)[0], { order: 1, sec: null, catchable: false, gone: true });
+});
+
+test('B10. 받은 지 1분 30초가 넘으면 "N분 전 정보"', () => {
+  assert.equal(staleText(30), null);
+  assert.equal(staleText(89), null);
+  assert.equal(staleText(90), '2분 전 정보');
+  assert.equal(staleText(600), '10분 전 정보');
 });
 
 test('B2. 도착 정보는 traTime(초)으로 읽고, 운행종료나 출발대기는 모름(null)', () => {

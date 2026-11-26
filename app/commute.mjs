@@ -72,6 +72,37 @@ export function catchableBus(stop, nodeul, ageSec = 0) {
  * 두 경로의 집 도착 예상 시각과 추천. bus 가 null 이면(6211 정보 없음) 지하철.
  * @returns {{bus:{boardAt:Date, homeAt:Date}|null, subway:{homeAt:Date}, pick:'bus'|'subway', diffMin:number}}
  */
+/**
+ * 정보가 만들어진 뒤 지난 초. 서울시 API 의 도착 예측은 서울시가 정보를 만든 시각(mkTm, 한국 시각 "YYYY-MM-DD HH:MM:SS.0") 기준이다.
+ * 그 값이 없으면 Worker 가 받은 시각(fetchedAt). 모르거나 미래면 0 (11-27 도착 오차 개선)
+ */
+export function dataAgeSec(data, now) {
+  const m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/.exec(String(data?.mkTm ?? ''));
+  const base = m
+    ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4] - 9, +m[5], +m[6]) // 한국 시각(UTC+9) → 기준 시각
+    : Date.parse(data?.fetchedAt ?? '');
+  if (!Number.isFinite(base)) return 0;
+  return Math.max(0, Math.round((now - base) / 1000));
+}
+
+/**
+ * 이번 버스와 다음 버스(11-27 사용자 요청). 지난 시간만큼 줄인 남은 초와, 걸어가서 탈 수 있는지.
+ * 예측 시각이 지났으면 gone(지나갔을 수 있음)으로 표시하고 sec 는 null. "1분 안에"로 계속 남지 않게(codex P2 11-27)
+ * @returns {{order:1|2, sec:number|null, catchable:boolean, gone:boolean}[]}
+ */
+export function busList(stop, ageSec = 0) {
+  return [1, 2].map((order) => {
+    const raw = busSeconds(stop?.[`arrmsg${order}`], stop?.[`traTime${order}`]);
+    const left = raw === null ? null : raw - ageSec;
+    const gone = left !== null && left < 0;
+    const sec = left === null || gone ? null : left;
+    return { order, sec, catchable: sec !== null && sec >= ROUTE.walkToStopMin * 60, gone };
+  });
+}
+
+/** 받은 지 1분 30초가 넘으면 오래된 정보라고 알린다 */
+export const staleText = (ageSec) => (ageSec >= 90 ? `${Math.round(ageSec / 60)}분 전 정보` : null);
+
 const hhmm = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 /** 도착까지 남은 시간 글자. 1분이 안 되면 "1분 안에" */
 export const waitText = (sec) => (sec < 60 ? '1분 안에' : `${Math.round(sec / 60)}분 뒤`);
