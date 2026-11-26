@@ -182,18 +182,46 @@ button.primary {
   background-size: 200% 100%; animation: shimmer 1.2s infinite linear; border-color: transparent;
 }
 .theme-banner-pill.loading { width: 84px; }
+/* 미리보기는 배너 오른쪽 절반을 위아래 끝까지 채우는 배경 층(11-26 사용자 요청).
+   왼쪽 가장자리는 투명하게 지워 글 쪽으로 자연스럽게 사라지고, 위아래 끝도 살짝 흐린다.
+   글은 이 층 위에 올라가고, 오른쪽 40% 는 비워 둬서 그림과 겹치는 곳은 그림이 거의 투명한 자리뿐이다 */
+.theme-banner { min-height: 150px; padding-right: 40%; }
+.theme-banner-icon, .theme-banner-text { position: relative; z-index: 1; }
 .theme-banner-thumb {
-  flex: none; position: relative; width: 112px; aspect-ratio: 16 / 10; border-radius: 8px; overflow: hidden;
-  display: inline-flex; align-items: center; justify-content: center; color: var(--muted);
-  background: var(--chip); border: 1px solid var(--line);
+  position: absolute; top: 0; right: 0; bottom: 0; width: 52%; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; padding-left: 18%; color: var(--muted);
+  /* 왼쪽 페이드는 여러 단계로 천천히(한 번에 꺾으면 폰에서 띠처럼 보인다) */
+  --tb-fade-x: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.08) 14%, rgba(0, 0, 0, 0.28) 28%, rgba(0, 0, 0, 0.58) 42%, rgba(0, 0, 0, 0.85) 56%, #000 70%);
+  --tb-fade-y: linear-gradient(to bottom, transparent 0%, #000 14%, #000 86%, transparent 100%);
+  -webkit-mask-image: var(--tb-fade-x), var(--tb-fade-y);
+  -webkit-mask-composite: source-in;
+  mask-image: var(--tb-fade-x), var(--tb-fade-y);
+  mask-composite: intersect;
 }
-.theme-banner-thumb.has-img { border-color: color-mix(in srgb, var(--tb-violet) 35%, var(--line)); box-shadow: 0 6px 16px -8px rgba(0, 0, 0, 0.45); }
-.theme-banner-thumb.failed { background: var(--risk-bg); color: var(--risk-ink); border-color: transparent; font-size: 11px; }
-.theme-banner-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-@media (min-width: 760px) { .theme-banner-thumb { width: 160px; } }
+.theme-banner-thumb svg { width: 56px; height: 56px; opacity: 0.35; }
+.theme-banner-thumb.has-img { padding-left: 0; }
+/* 로딩 반짝임은 페이드에 가려 흐려지므로 바탕을 한 단계 진하게 */
+.theme-banner-thumb.loading {
+  --tb-sk-a: color-mix(in srgb, var(--muted) 22%, var(--surface)); --tb-sk-b: color-mix(in srgb, var(--muted) 8%, var(--surface));
+  background-image: linear-gradient(90deg, var(--tb-sk-a) 25%, var(--tb-sk-b) 50%, var(--tb-sk-a) 75%);
+}
+.theme-banner-thumb.failed { background: var(--risk-bg); color: var(--risk-ink); font-size: 12px; }
+.theme-banner-thumb img {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: right center; display: block;
+  transition: transform 0.4s ease;
+}
+.theme-banner:hover .theme-banner-thumb img { transform: scale(1.04); }
+/* 그림 위에 겹쳐도 읽히게 지금 테마 표시는 반투명 배경과 흐림 효과 */
+.theme-banner-pill:not(.loading) { -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.theme-banner-pill:not(.loading):not(.quiet):not(.fail) { background: color-mix(in srgb, var(--tb-violet) 14%, color-mix(in srgb, var(--surface) 75%, transparent)); }
+@media (max-width: 559px) {
+  .theme-banner { padding-right: 36%; }
+  .theme-banner-thumb { width: 58%; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .theme-banner, .theme-banner-arrow { transition: none; }
+  .theme-banner, .theme-banner-arrow, .theme-banner-thumb img { transition: none; }
   .theme-banner:hover { transform: none; }
+  .theme-banner:hover .theme-banner-thumb img { transform: none; }
   .theme-banner-pill.loading, .theme-banner-thumb.loading { animation: none; }
 }
 /* 테마 갤러리 (11-26). 폰 1열, 넓은 화면 2열. 미리보기는 16:10 자리를 먼저 잡아 영상이 와도 밀리지 않는다 */
