@@ -546,13 +546,13 @@ button.primary {
 .board-title small { font-size: 12px; font-weight: 400; color: var(--muted); }
 
 /* 칸 배치. PC: 왼쪽(레일, 관제탑, 라운지) + 오른쪽(오늘 도착과 나중에, 도착 안내와 운항 기록) */
-.airport { display: grid; gap: 18px; margin-top: 16px; grid-template-columns: minmax(0, 1fr); grid-template-areas: 'commute' 'rail' 'top' 'tower' 'lounge' 'bottom'; }
+.airport { display: grid; gap: 18px; margin-top: 16px; grid-template-columns: minmax(0, 1fr); grid-template-areas: 'rail' 'top' 'tower' 'lounge' 'bottom'; }
 .ap-main, .ap-aside { display: contents; }
-.ap-rail { grid-area: rail; } .ap-top { grid-area: top; } .ap-tower { grid-area: tower; } .ap-lounge { grid-area: lounge; } .ap-bottom { grid-area: bottom; } .cm { grid-area: commute; }
+.ap-rail { grid-area: rail; } .ap-top { grid-area: top; } .ap-tower { grid-area: tower; } .ap-lounge { grid-area: lounge; } .ap-bottom { grid-area: bottom; }
 @media (min-width: 960px) {
   .airport { grid-template-columns: minmax(0, 1fr) 320px; grid-template-areas: none; align-items: start; }
   .ap-main, .ap-aside { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
-  .ap-rail, .ap-top, .ap-tower, .ap-lounge, .ap-bottom, .cm { grid-area: auto; }
+  .ap-rail, .ap-top, .ap-tower, .ap-lounge, .ap-bottom { grid-area: auto; }
 }
 .later-list { max-height: 340px; overflow-y: auto; }
 .ap-bottom, .bp-side { display: flex; flex-direction: column; gap: 14px; }
@@ -692,22 +692,55 @@ button.primary {
 .side-card h3 { margin: 0 0 8px; font-size: 14px; }
 .side-empty { margin: 0; font-size: 13px; color: var(--muted); }
 
-/* 귀가편 6211(11-26): 지선버스 초록 띠, 집 도착 시각은 안내판 글씨처럼 */
+/* 귀가편 6211(#163 11-27): 시계 옆 추천 알약 + 드롭다운. 알약은 추천 경로의 노선 색(지선버스 초록, 4호선 하늘색) */
+.cm { --bus: #2fbf5b; --subway: #00a5de; position: relative; align-self: center; }
 .cm[hidden] { display: none; }
-.cm { border-top: 4px solid var(--st-boarding); }
-.cm h3 small { font-weight: 400; font-size: 12px; color: var(--muted); }
+.cm-pill {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 16px; border: 0; border-radius: 999px;
+  font: inherit; font-size: 14px; font-weight: 800; letter-spacing: -0.01em; white-space: nowrap; cursor: pointer;
+  box-shadow: 0 6px 18px -8px rgba(0, 0, 0, .6);
+}
+.cm-pill.bus { background: var(--bus); color: #04230f; box-shadow: 0 0 0 3px color-mix(in srgb, var(--bus) 35%, transparent), 0 6px 18px -6px var(--bus); }
+.cm-pill.subway { background: var(--subway); color: #fff; box-shadow: 0 0 0 3px color-mix(in srgb, var(--subway) 35%, transparent), 0 6px 18px -6px var(--subway); }
+.cm-pill.manual { background: var(--board); color: var(--flap); box-shadow: inset 0 0 0 2px var(--flap); }
+.cm-pill.fail { background: var(--board); color: #ff8a80; box-shadow: inset 0 0 0 2px #ff5a4f; }
+.cm-pill.loading { width: 190px; background: color-mix(in srgb, var(--board-muted) 35%, transparent); box-shadow: none; animation: cm-shimmer 1.2s ease-in-out infinite; cursor: default; }
+.cm-pill.hurry { animation: cm-pulse 1.1s ease-in-out infinite; }
+.cm-pill:focus-visible { outline: 2px solid var(--flap); outline-offset: 3px; }
+@keyframes cm-pulse { 50% { transform: scale(1.04); filter: brightness(1.15); } }
+@keyframes cm-shimmer { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .cm-pill.hurry, .cm-pill.loading { animation: none; } }
+.cm-drop {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 30; width: 320px; padding: 14px; border-radius: 12px;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line); box-shadow: 0 18px 40px -16px rgba(0, 0, 0, .7);
+}
+.cm-drop[hidden] { display: none; }
+/* 알약과 드롭다운 사이 8px 틈을 메우는 보이지 않는 다리. 마우스가 틈을 지나는 동안 닫히지 않게(codex P2 11-27) */
+.cm-drop::before { content: ''; position: absolute; left: 0; right: 0; top: -10px; height: 10px; }
 .cm-lead { display: flex; flex-direction: column; gap: 2px; margin: 0 0 10px; font-size: 13px; color: var(--muted); }
 .cm-lead strong { font-size: 20px; color: var(--ink); }
 .cm-hurry { color: var(--risk-ink); font-weight: 700; }
 .cm-rows { display: flex; flex-direction: column; gap: 6px; }
 .cm-row { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; padding: 8px 10px; border-radius: 8px; background: var(--chip); font-size: 13px; }
 .cm-row b { font-family: var(--mono); font-size: 15px; white-space: nowrap; }
-.cm-row.best { background: var(--board); color: var(--flap); box-shadow: inset 3px 0 0 var(--st-boarding); }
-.cm-verdict { margin: 10px 0 0; font-weight: 700; font-size: 14px; }
-.cm-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--muted); }
-.cm-foot:empty { display: none; }
+.cm-row.bus.best { background: var(--bus); color: #04230f; }
+.cm-row.subway.best { background: var(--subway); color: #fff; }
+.cm-verdict { margin: 10px 0 0; font-weight: 800; font-size: 14px; }
+.cm-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 10px 0 0; font-size: 12px; color: var(--muted); }
 .cm-check { margin-left: auto; padding: 6px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; }
-.cm-check:disabled { opacity: .5; cursor: default; }
+@media (max-width: 759px) {
+  /* 폰: 시계 묶음을 풀어(display: contents) 알약만 제목과 시계 아래 줄로 내린다. 그래야 제목이 눌려 접히지 않는다 */
+  .bp-head { flex-wrap: wrap; row-gap: 10px; }
+  .dc-pair { display: contents; }
+  .dc-pair > .cm + .dc-world, .dc-pair > .cm[hidden] + .dc-world { margin-left: auto; }
+  .cm { order: 9; flex-basis: 100%; display: flex; justify-content: flex-end; }
+  .cm[hidden] { display: none; }
+  .cm-drop { left: 0; right: 0; width: auto; }
+}
+.cm-row span { word-break: keep-all; }
+/* 할 일 번호(#163 11-27): /todo 와 Claude 가 부르는 번호. 탑승권은 바코드 밑, 목록은 제목 앞에 흐리게 */
+.bp-no { margin: 4px 0 0; font-family: var(--mono); font-size: 11px; letter-spacing: .12em; color: var(--paper-ink); opacity: .7; }
+.task-no { margin-right: 6px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
 .done-list, .later-list, .arrivals { list-style: none; margin: 0; padding: 0; }
 .done-list li { display: flex; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
 .done-mark { color: var(--ok); font-weight: 800; }

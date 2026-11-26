@@ -66,6 +66,21 @@ export function catchableBus(stop, nodeul, ageSec = 0) {
  * 두 경로의 집 도착 예상 시각과 추천. bus 가 null 이면(6211 정보 없음) 지하철.
  * @returns {{bus:{boardAt:Date, homeAt:Date}|null, subway:{homeAt:Date}, pick:'bus'|'subway', diffMin:number}}
  */
+const hhmm = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+/** 도착까지 남은 시간 글자. 1분이 안 되면 "1분 안에" */
+export const waitText = (sec) => (sec < 60 ? '1분 안에' : `${Math.round(sec / 60)}분 뒤`);
+
+/**
+ * 시계 옆 추천 알약(#163, 11-27). 추천 경로, 도착까지 남은 시간, 집 도착 시각을 한 줄로.
+ * tone 은 색(bus 지선버스 초록, subway 4호선 하늘색), hurry 는 "지금 바로 나가야 탈 수 있다"(깜빡임)
+ */
+export function badgeText(plan, bus) {
+  if (plan.pick === 'bus' && plan.bus && bus) {
+    return { tone: 'bus', text: `6211 ${waitText(bus.waitSec)} 도착 → 집 ${hhmm(plan.bus.homeAt)}`, hurry: !!bus.late };
+  }
+  return { tone: 'subway', text: `지하철 → 집 ${hhmm(plan.subway.homeAt)}`, hurry: false };
+}
+
 export function homePlan(now, bus) {
   const subway = { homeAt: new Date(now.getTime() + ROUTE.subwayTotalMin * MIN) };
   if (!bus) return { bus: null, subway, pick: 'subway', diffMin: 0 };

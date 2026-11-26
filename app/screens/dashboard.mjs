@@ -16,7 +16,6 @@ import { loadThemeBanner } from '../themes.mjs';
 import { towerStatus, flightPrefix, TOWER_LABEL, towerNowText } from '../airport.mjs';
 import { VIDEO_REPO, VIDEO_TASKS_PATH, STATUS_LABEL, parseTaskList, nextUp } from '../video.mjs';
 import { LAB } from '../catalog.mjs';
-import { commuteCard } from './commute.mjs';
 
 const TIMELINE_DAYS = 14;
 const LATEST_COUNT = 10;
@@ -387,7 +386,7 @@ export function dashboardScreen(store, catalog) {
     'div',
     { class: 'airport' },
     h('div', { class: 'ap-main' }, rail, tower.section, lounge),
-    // 귀가편 6211(11-26): 평일 17시부터 옆 칸 맨 위에 나타난다(commute.mjs)
-    h('aside', { class: 'ap-aside' }, commuteCard(), side, h('div', { class: 'ap-bottom' }, arrivalsSection(catalog), flightLogSection(catalog)))
+    // 귀가편 6211 은 탑승권 레일 머리의 시계 옆으로 옮겼다(#163, passes.mjs)
+    h('aside', { class: 'ap-aside' }, side, h('div', { class: 'ap-bottom' }, arrivalsSection(catalog), flightLogSection(catalog)))
   );
 }

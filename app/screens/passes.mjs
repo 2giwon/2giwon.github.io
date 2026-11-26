@@ -11,6 +11,7 @@ import { boardingPasses, PASS_LABEL, flapFrames } from '../airport.mjs';
 import { LAB } from '../catalog.mjs';
 import { nowWorldClock, offWorkClock } from '../clock.mjs';
 import { LIVE_MS, canRefresh, tasksChanged } from '../live.mjs';
+import { commuteBadge } from './commute.mjs';
 
 const REDMINE = 'https://redmine.wp-dev.xyz/issues/';
 const SWIPE_PX = 90;
@@ -332,7 +333,9 @@ export function passesSection(store, projects, onChange = () => {}) {
         h('p', { class: 'bp-proj' }, p.project?.label ?? (t.project || '프로젝트 없음')),
         h('div', { class: 'bp-meta' }, cell('게이트', gate), cell('대기', p.carryDays > 0 ? `${p.carryDays}일째` : '오늘'), cell('단계', STAGE_LABEL[t.stage])),
         h('div', { class: 'bp-perf', 'aria-hidden': 'true' }),
-        h('div', { class: 'bp-code', 'aria-hidden': 'true' })
+        h('div', { class: 'bp-code', 'aria-hidden': 'true' }),
+        // 할 일 번호(#163 11-27). 실제 탑승권처럼 바코드 밑에 찍는다. /todo 와 Claude 가 부르는 번호와 같다
+        h('p', { class: 'bp-no' }, `No. ${t.id}`)
       ),
       h(
         'div',
@@ -402,7 +405,7 @@ export function passesSection(store, projects, onChange = () => {}) {
 
     doneBox.replaceChildren(
       h('h3', null, `오늘 도착 ${v.doneToday.length}`),
-      v.doneToday.length ? h('ul', { class: 'done-list' }, v.doneToday.map((t) => h('li', null, h('span', { class: 'done-mark', 'aria-hidden': 'true' }, '✓'), t.title))) : h('p', { class: 'side-empty' }, '아직 끝낸 일이 없어요')
+      v.doneToday.length ? h('ul', { class: 'done-list' }, v.doneToday.map((t) => h('li', null, h('span', { class: 'done-mark', 'aria-hidden': 'true' }, '✓'), h('span', { class: 'task-no' }, t.id), t.title))) : h('p', { class: 'side-empty' }, '아직 끝낸 일이 없어요')
     );
     // 나중에는 접지 않고 늘 펼쳐 둔다 — 접어 두면 열어 보지 않게 된다(11-19 사용자 결정)
     laterBox.replaceChildren(
@@ -416,7 +419,7 @@ export function passesSection(store, projects, onChange = () => {}) {
                 'li',
                 null,
                 h('span', { class: `later-dot ${t.stage}`, title: STAGE_LABEL[t.stage], 'aria-hidden': 'true' }),
-                h('span', { class: 'later-title', title: t.title }, t.title),
+                h('span', { class: 'later-title', title: t.title }, h('span', { class: 'task-no' }, t.id), t.title),
                 h('button', { type: 'button', class: 'later-btn', onclick: () => void save((d) => moveToToday(d, t.id, today()), `할 일 오늘로: ${t.title}`) }, '오늘로')
               )
             )
@@ -529,7 +532,7 @@ export function passesSection(store, projects, onChange = () => {}) {
     'section',
     { class: 'bp-area', 'aria-label': '오늘 탑승할 주문' },
     // 시계 두 개(세계 시계처럼): 서울 지금(노랑), 퇴근까지(빨강, 퇴근 뒤 초록). 막대 7개 숫자, : 가 1초마다 깜빡인다(11-26 사용자 요청, clock.mjs)
-    h('header', { class: 'bp-head' }, h('h2', null, '오늘 탑승할 주문'), count, h('span', { class: 'dc-pair' }, nowWorldClock(h), offWorkClock(h))),
+    h('header', { class: 'bp-head' }, h('h2', null, '오늘 탑승할 주문'), count, h('span', { class: 'dc-pair' }, commuteBadge(), nowWorldClock(h), offWorkClock(h))),
     status,
     h('div', { class: 'bp-rail', 'aria-hidden': 'true' }),
     passesBox,

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { commuteMode, busSeconds, catchableBus, homePlan, ROUTE } from '../app/commute.mjs';
+import { commuteMode, busSeconds, catchableBus, homePlan, badgeText, ROUTE } from '../app/commute.mjs';
 
 // 2026-11-26 은 목요일
 const at = (h, m, day = 26) => new Date(2026, 10, day, h, m, 0);
@@ -73,4 +73,16 @@ test('B4. 6211 이 오래 걸리면 지하철, 버스 정보가 없으면 지하
   const none = homePlan(now, null);
   assert.equal(none.pick, 'subway');
   assert.equal(none.bus, null);
+});
+
+test('B6. 시계 옆 추천 알약: 추천 경로, 도착까지 남은 시간, 집 도착 시각을 한 줄로', () => {
+  const now = at(17, 6);
+  const bus = { waitSec: 960, rideSec: 480, vehId: '1', missedFirst: false, late: false };
+  const p = homePlan(now, bus); // 6211 쪽 집 18:09 > 지하철 18:06
+  assert.deepEqual(badgeText(p, bus), { tone: 'subway', text: '지하철 → 집 18:06', hurry: false });
+  const fast = { waitSec: 240, rideSec: 480, vehId: '1', missedFirst: false, late: true };
+  assert.deepEqual(badgeText(homePlan(now, fast), fast), { tone: 'bus', text: '6211 4분 뒤 도착 → 집 17:57', hurry: true });
+  const soon = { ...fast, waitSec: 40 };
+  assert.equal(badgeText(homePlan(now, soon), soon).text.startsWith('6211 1분 안에 도착'), true);
+  assert.deepEqual(badgeText(homePlan(now, null), null), { tone: 'subway', text: '지하철 → 집 18:06', hurry: false });
 });
