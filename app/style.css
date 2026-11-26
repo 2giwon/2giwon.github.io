@@ -563,7 +563,7 @@ button.primary {
 .bp-status.saving { color: var(--flap); }
 .bp-status.error { color: #ff8a80; }
 .bp-rail { height: 14px; margin: 8px -4px 0; border-radius: 7px; background: linear-gradient(var(--rail-a), var(--rail-b)); }
-.bp-rail-passes { display: flex; gap: 16px; margin-top: -3px; padding: 0 6px 12px; overflow-x: auto; scroll-snap-type: x proximity; }
+.bp-rail-passes { display: flex; gap: 16px; margin-top: -3px; padding: 0 40px 16px 6px; overflow-x: auto; scroll-snap-type: x proximity; }
 .bp-hint { margin: 6px 0 0; font-size: 12px; color: var(--board-muted); }
 @media (hover: hover) and (pointer: fine) { .bp-hint { display: none; } }
 
@@ -572,12 +572,14 @@ button.primary {
   --band: var(--st-waiting); --band-ink: #2b2d31;
   flex: 0 0 260px; scroll-snap-align: start; position: relative; display: flex; flex-direction: column;
   background: var(--paper); color: var(--paper-ink); border-radius: 4px 4px 10px 10px;
-  box-shadow: 0 14px 20px -14px #000; transform-origin: 50% 0; transition: transform .25s ease, opacity .25s ease;
+  box-shadow: 0 14px 20px -14px #000; transform-origin: 50% -6px; transition: opacity .25s ease;
   user-select: none; cursor: pointer;
+  /* 집게(위 가운데)를 축으로 기본 기울기(--tilt) + 레일을 넘길 때 흔들림(--swing, 탑승권마다 --k 배) */
+  transform: rotate(calc(var(--tilt, 0deg) + var(--swing, 0deg) * var(--k, 1)));
 }
 .bp-btn.bp-flip { flex: 0 0 auto; padding: 9px 10px; }
 .bp::before { content: ''; position: absolute; left: 50%; top: -7px; width: 44px; height: 14px; transform: translateX(-50%); background: #6d737c; border-radius: 3px; z-index: 2; }
-.bp:nth-child(3n+2) { transform: rotate(1deg); } .bp:nth-child(3n) { transform: rotate(-0.8deg); }
+.bp:nth-child(3n+1) { --k: 1; } .bp:nth-child(3n+2) { --tilt: 1deg; --k: 1.25; } .bp:nth-child(3n) { --tilt: -0.8deg; --k: 0.8; }
 .bp.st-boarding { --band: var(--st-boarding); --band-ink: #062a12; }
 .bp.st-delayed { --band: var(--st-delayed); --band-ink: #2a2000; }
 .bp-front, .bp-back { display: flex; flex-direction: column; flex: 1; }
@@ -632,7 +634,7 @@ button.primary {
 /* 폰: 탑승권 더미. 맨 앞 한 장만 크게, 뒤 두 장은 겹쳐 살짝 보인다. 발권 칸은 더미 아래 */
 @media (max-width: 759px) {
   .bp-rail-passes { display: grid; overflow: visible; padding: 0 4px 8px; }
-  .bp-rail-passes > .bp { grid-area: 1 / 1; width: 100%; touch-action: pan-y; }
+  .bp-rail-passes > .bp { grid-area: 1 / 1; width: 100%; touch-action: pan-y; transition: transform .25s ease, opacity .25s ease; }
   .bp-rail-passes > .bp:nth-child(n) { transform: none; }
   .bp-rail-passes > .bp:nth-child(2) { transform: translateY(12px) scale(.95); transform-origin: 50% 100%; opacity: .7; z-index: -1; pointer-events: none; }
   .bp-rail-passes > .bp:nth-child(3) { transform: translateY(24px) scale(.9); transform-origin: 50% 100%; opacity: .45; z-index: -2; pointer-events: none; }
@@ -685,7 +687,6 @@ button.primary {
 .tw-group + .tw-group { margin-top: 12px; }
 .tw-group > h3 { margin: 0 0 6px; font-size: 13px; color: var(--muted); }
 .tw-strip { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
-@media (max-width: 759px) { .tw-strip { display: flex; overflow-x: auto; scroll-snap-type: x proximity; padding-bottom: 4px; } .tw-strip > .tw-item { flex: 0 0 72%; scroll-snap-align: start; } }
 .tw-item {
   display: flex; flex-direction: column; gap: 4px; text-align: left; font: inherit; color: var(--board-ink); text-decoration: none;
   padding: 10px 12px; border: 1px solid var(--board-3); border-radius: 8px; background: var(--board); cursor: pointer; min-width: 0;
@@ -724,6 +725,46 @@ button.primary {
 .twd-col.state { border-color: var(--st-arrived); } .twd-col.next { border-color: var(--st-boarding); } .twd-col.open { border-color: var(--st-delayed); }
 .twd-col h4 { color: var(--paper-muted); }
 .twd-col ul { margin: 0; padding-left: 16px; font-size: 13px; line-height: 1.6; }
+
+/* ─── 샘플(섞기 2)처럼 상태판 전체를 하나의 어두운 공항 터미널로 (11-26 사용자 지적) ───
+   바닥(낮은 콘크리트, 밤은 검정) 위에 검은 터미널 한 장. 칸마다 따로 떠 있던 밝은 상자를 없앤다 */
+.airport { background: var(--board); color: var(--board-ink); border-radius: 18px; padding: 18px; box-shadow: 0 20px 40px -28px #000; }
+@media (max-width: 759px) { .airport { margin: 12px -10px 0; padding: 14px 12px; border-radius: 14px; } }
+.airport .bp-area { background: transparent; padding: 0; border-radius: 0; overflow: visible; }
+.airport .board-title > span { background: var(--board-3); }
+.airport .board-title small { color: var(--board-muted); }
+.airport .side-card { background: var(--board-2); border-color: var(--board-3); color: var(--board-ink); }
+.airport .side-card h3 { color: var(--flap); }
+.airport .side-empty, .airport .done-list li { color: var(--board-muted); }
+.airport .done-list li, .airport .later-list li { border-top-color: var(--board-3); }
+.airport .later-title { color: var(--board-ink); }
+.airport .later-btn { border-color: var(--board-3); color: var(--flap); }
+.airport .board-card { background: var(--board-2); border-color: var(--board-3); }
+.airport .skeleton span { background: linear-gradient(90deg, var(--board-3) 25%, #34373c 50%, var(--board-3) 75%); background-size: 200% 100%; }
+/* 관제탑: 샘플처럼 아래쪽에 작은 칸이 한 줄로(넓으면 여러 줄) 늘어선다. 회사, 개인 묶음 제목은 칸의 편명으로 대신한다 */
+.airport .tower { background: transparent; border: 0; padding: 4px 0 0; border-top: 1px dashed var(--board-3); border-radius: 0;
+  display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); align-items: stretch; }
+.airport .tower > * { grid-column: 1 / -1; }
+.airport .tower .tw-group, .airport .tower .tw-strip { display: contents; }
+.airport .tower .tw-group > h3 { display: none; }
+.airport .tower .tw-item { grid-column: auto; background: var(--board-2); border-color: var(--board-3); }
+@media (max-width: 759px) {
+  .airport .tower { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .airport .tower .tw-video { grid-column: 1 / -1; }
+  .airport .tower .tw-item { padding: 8px 10px; }
+  .airport .tower .tw-name { font-size: 14px; }
+  .airport .tower .tw-top .flap i { min-width: 15px; font-size: 11px; padding: 3px 2px; }
+  .airport .tower .tw-pill { font-size: 11px; padding: 2px 6px; }
+}
+.airport .tower .tw-archived, .airport .tower .tw-group > .empty, .airport .tower .tw-group > .failure { grid-column: 1 / -1; }
+.airport .tower .board-title { margin-top: 10px; }
+.airport .tw-archived summary { color: var(--board-muted); }
+.airport .tw-archived a { color: var(--flap); }
+/* PC: 탑승권 버튼은 샘플처럼 숨겨 두고, 마우스를 올리거나 키보드로 들어오면 나타난다 */
+@media (hover: hover) and (pointer: fine) and (min-width: 760px) {
+  .bp-front .bp-actions { opacity: 0; transform: translateY(-4px); transition: opacity .15s ease, transform .15s ease; }
+  .bp:hover .bp-actions, .bp:focus-within .bp-actions { opacity: 1; transform: none; }
+}
 
 /* ─── 라운지 창문(Claude 테마): 배너는 위 .theme-banner 그대로, 검은 창틀만 두른다 ─── */
 .lounge .theme-banner { border: 6px solid var(--board); border-radius: 16px; }

@@ -14,6 +14,50 @@ const REDMINE = 'https://redmine.wp-dev.xyz/issues/';
 const SWIPE_PX = 90;
 const UNDO_MS = 5000;
 
+/**
+ * 레일을 옆으로 넘기면 집게에 매달린 탑승권이 흔들리다 멈춘다(11-26 사용자 요청).
+ * 넘긴 거리만큼 반대쪽으로 밀어 주고, 용수철처럼 줄어들며 제자리로 돌아온다. 각도는 레일의 --swing 값으로 넘기고
+ * 탑승권마다 --k 를 곱해 조금씩 다르게 흔들린다(style.css). 움직임 줄이기 설정이면 흔들지 않는다.
+ */
+function swingOnScroll(box) {
+  if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const MAX = 6; // 도
+  let last = box.scrollLeft;
+  let angle = 0;
+  let vel = 0;
+  let raf = 0;
+  // 사람이 넘긴 스크롤에만 흔든다. 탑승권이 기울면 레일 폭이 바뀌어 스크롤 사건이 다시 생기는데,
+  // 그것까지 흔들면 기울기가 끝없이 커진다(11-26 실제로 확인)
+  let userUntil = 0;
+  const touched = () => (userUntil = performance.now() + 400);
+  for (const ev of ['wheel', 'pointerdown', 'pointermove', 'touchmove', 'keydown']) box.addEventListener(ev, touched, { passive: true });
+  const step = () => {
+    vel += -angle * 0.06; // 제자리로 당기는 힘(작을수록 천천히 흔들린다)
+    vel *= 0.92; // 공기 저항
+    angle = Math.max(-MAX, Math.min(MAX, angle + vel));
+    if (Math.abs(angle) < 0.03 && Math.abs(vel) < 0.03) {
+      angle = 0;
+      vel = 0;
+      raf = 0;
+      box.style.setProperty('--swing', '0deg');
+      return;
+    }
+    box.style.setProperty('--swing', `${angle.toFixed(2)}deg`);
+    raf = requestAnimationFrame(step);
+  };
+  box.addEventListener(
+    'scroll',
+    () => {
+      const d = box.scrollLeft - last;
+      last = box.scrollLeft;
+      if (performance.now() > userUntil) return;
+      vel += Math.max(-1.6, Math.min(1.6, -d * 0.03));
+      if (!raf) raf = requestAnimationFrame(step);
+    },
+    { passive: true }
+  );
+}
+
 function saveErrorText(e) {
   if (e?.kind === 'forbidden') return '토큰에 쓰기 권한이 없어요';
   if (e?.kind === 'conflict') return '다른 곳에서 동시에 고쳐 저장하지 못했어요. 다시 해 주세요';
@@ -36,6 +80,7 @@ const cell = (label, value) => h('div', { class: 'bp-cell' }, h('small', null, l
  */
 export function passesSection(store, projects, onChange = () => {}) {
   const passesBox = h('div', { class: 'bp-rail-passes' }, [1, 2, 3].map(() => h('div', { class: 'bp bp-skeleton' }, skeleton(4))));
+  swingOnScroll(passesBox);
   const status = h('p', { class: 'bp-status', role: 'status' });
   const count = h('span', { class: 'bp-count' });
   const laterBox = h('div', { class: 'later-box' }, skeleton(3));
