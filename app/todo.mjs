@@ -109,6 +109,8 @@ export function addTask(data, { title, stage = 'normal', doOn = undefined, proje
 export const completeTask = (data, id, today) => replaceTask(data, id, { status: 'done', doneOn: today });
 export const moveToToday = (data, id, today) => replaceTask(data, id, { doOn: today });
 export const moveToLater = (data, id) => replaceTask(data, id, { doOn: null });
+/** 되돌리기(11-26 탑승권 밀기 실수 대비). 완료나 나중에로 옮기기 직전의 상태, 할 날, 끝낸 날로 돌린다 */
+export const restoreTask = (data, id, { status, doOn, doneOn }) => replaceTask(data, id, { status, doOn, doneOn });
 
 export function setStage(data, id, stage) {
   if (!STAGES.includes(stage)) throw new Error(`모르는 단계: ${stage}`);

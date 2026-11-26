@@ -43,7 +43,8 @@ export function tokenScreen({ reason = null, onSaved }) {
   return h(
     'section',
     { class: 'token-screen' },
-    h('h1', null, '작업노트'),
+    // 11-26 작업노트 국제공항: 토큰 화면은 탑승 수속 카운터
+    h('h1', null, h('span', { class: 'flap', 'aria-hidden': 'true' }, h('i', null, 'W'), h('i', null, 'N')), '작업노트 탑승 수속'),
     reason ? h('p', { class: 'banner warn', role: 'alert' }, reason) : null,
     h('p', null, '나만 보는 작업 문서 화면입니다. 토큰을 넣어야 볼 수 있습니다.'),
     form,

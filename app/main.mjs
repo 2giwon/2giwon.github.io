@@ -82,7 +82,8 @@ async function render(force = false) {
     h(
       'nav',
       { class: 'topbar' },
-      h('a', { class: 'brand', href: '#/' }, '작업노트'),
+      // 11-26 작업노트 국제공항: 글자판 모양 공항 부호 WN + 이름
+      h('a', { class: 'brand', href: '#/' }, h('span', { class: 'flap', 'aria-hidden': 'true' }, h('i', null, 'W'), h('i', null, 'N')), '작업노트'),
       shortcuts,
       h(
         'span',
