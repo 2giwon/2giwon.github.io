@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { flightPrefix, boardingPasses, matchProject, towerStatus, TOWER_LABEL, PASS_LABEL } from '../app/airport.mjs';
+import { flightPrefix, boardingPasses, matchProject, towerStatus, TOWER_LABEL, PASS_LABEL, flapFrames, towerNowText, FLAP_ALPHA } from '../app/airport.mjs';
 import { restoreTask } from '../app/todo.mjs';
 
 const task = (id, over = {}) => ({ id, title: `할 일 ${id}`, stage: 'normal', doOn: '2026-11-26', status: 'todo', project: '', ...over });
@@ -84,6 +84,33 @@ test('A4. 관제탑 상태는 결항 → 탑승 중 → 지연 → 도착 → �
 test('A4. 미결을 아직 모르면(읽는 중) checking', () => {
   assert.equal(towerStatus({ paused: false, todayCount: 0, hasOpen: null, lastDate: '2026-11-25' }, T), 'checking');
   assert.equal(towerStatus({ paused: false, todayCount: 1, hasOpen: null, lastDate: '2026-11-25' }, T), 'boarding');
+});
+
+// ─── 글자판 촤르르 ───────────────────────────────────────────────────────────
+
+test('A6. 글자판은 글자마다 여러 글자를 돌다가 왼쪽부터 차례로 제자리에 멈춘다', () => {
+  let i = 0;
+  const rnd = () => (i++ % 7) / 7;
+  const frames = flapFrames('LM1', rnd);
+  assert.equal(frames.at(-1), 'LM1');
+  assert.ok(frames.length >= 8, '충분히 돌아야 촤르르 느낌이 난다');
+  assert.ok(frames.every((f) => f.length === 3));
+  // 첫 글자가 먼저 멈추고, 마지막 글자가 가장 늦게 멈춘다
+  const settledAt = (pos) => frames.findIndex((f, k) => frames.slice(k).every((g) => g[pos] === 'LM1'[pos]));
+  assert.ok(settledAt(0) < settledAt(1) && settledAt(1) < settledAt(2));
+  // 도는 동안의 글자는 글자판에 있는 글자만
+  assert.ok(frames.slice(0, -1).every((f) => [...f].every((c) => FLAP_ALPHA.includes(c))));
+});
+
+// ─── 관제탑 지금 할 일 ──────────────────────────────────────────────────────
+
+test('A7. 지금 할 일 칸: 오늘 할 일 → 핸드오프 다음 할 일 → 지금 상태 → 소식 없음 순', () => {
+  const card = { state: ['PR 머지'], next: ['QR 답 받기'], open: [] };
+  assert.equal(towerNowText({ todayTitle: '사진 보여주기', card, lastDate: '2026-11-24' }), '사진 보여주기');
+  assert.equal(towerNowText({ todayTitle: null, card, lastDate: '2026-11-24' }), 'QR 답 받기');
+  assert.equal(towerNowText({ todayTitle: null, card: { state: ['PR 머지'], next: [], open: [] }, lastDate: null }), 'PR 머지');
+  assert.equal(towerNowText({ todayTitle: null, card: null, lastDate: '2026-11-19' }), '11월 19일 이후 소식 없음');
+  assert.equal(towerNowText({ todayTitle: null, card: null, lastDate: null }), '소식 없음');
 });
 
 // ─── 되돌리기 ────────────────────────────────────────────────────────────────

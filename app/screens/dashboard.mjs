@@ -8,13 +8,12 @@
 import { h, skeleton, failure, empty, errorText, koDate } from '../dom.mjs';
 import { handoverCard } from '../handover.mjs';
 import { passesSection, flap } from './passes.mjs';
-import { progressBar } from './video.mjs';
 import { recentTimeline } from '../timeline.mjs';
 import { timelineChart } from '../draw.mjs';
 import { today } from '../store.mjs';
 import { iconSvg } from '../icons.mjs';
 import { loadThemeBanner } from '../themes.mjs';
-import { towerStatus, flightPrefix, TOWER_LABEL } from '../airport.mjs';
+import { towerStatus, flightPrefix, TOWER_LABEL, flapFrames, towerNowText } from '../airport.mjs';
 import { VIDEO_REPO, VIDEO_TASKS_PATH, STATUS_LABEL, parseTaskList, nextUp } from '../video.mjs';
 import { LAB } from '../catalog.mjs';
 
@@ -35,33 +34,76 @@ function titleOf(path) {
 
 const boardTitle = (text, extra = null) => h('h2', { class: 'board-title' }, h('span', null, text), extra);
 
-// ─── 관제탑 띠 ────────────────────────────────────────────────────────────────
+// ─── 관제탑: 출발 안내판 표(11-26 사용자 요청, 샘플 H 모양) ───────────────────
+// 열: 편명, 목적지(프로젝트), 지금 할 일, 게이트, 상태. 편명 글자판은 몇 초마다 전광판처럼 "촤르르" 돌다 멈춘다.
 
-/** 프로젝트 하나의 관제탑 칸. 최신 핸드오프를 읽어 미결이 있는지 알아낸다 */
-function towerItem(store, p, onSelect) {
-  const state = { hasOpen: p.latestHandover ? null : false, card: null, fig: null, error: null, todayCount: 0, tasksLoaded: false };
+const FLAP_TICK_MS = 45; // 글자판 한 장 넘기는 간격
+const FLAP_EVERY_MS = 9000; // 이만큼마다 안내판 전체가 한 줄씩 차례로 촤르르
+const FLAP_ROW_GAP_MS = 140; // 줄과 줄 사이 시간차
+const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** 전광판 글자판 하나(LM1 처럼 여러 칸). spin(새 글자) 로 촤르르 돌다 멈춘다 */
+function flapBoard(code) {
+  const el = h('span', { class: 'flap board-flap', 'aria-label': `편명 ${code}` });
+  let current = '';
+  let timer = 0;
+  const show = (text) => {
+    const cells = [...text];
+    while (el.children.length < cells.length) el.append(h('i', { 'aria-hidden': 'true' }));
+    while (el.children.length > cells.length) el.lastChild.remove();
+    cells.forEach((c, i) => {
+      const cell = el.children[i];
+      if (cell.textContent !== c) {
+        cell.textContent = c;
+        cell.classList.remove('tick');
+        void cell.offsetWidth; // 같은 칸이 연달아 바뀌어도 넘기는 움직임이 다시 보이게
+        cell.classList.add('tick');
+      }
+    });
+  };
+  const spin = (target) => {
+    clearInterval(timer);
+    el.setAttribute('aria-label', `편명 ${target}`);
+    current = target;
+    if (reducedMotion() || !el.isConnected) return show(target);
+    const frames = flapFrames(target);
+    let k = 0;
+    timer = setInterval(() => {
+      show(frames[k]);
+      k += 1;
+      if (k >= frames.length) clearInterval(timer);
+    }, FLAP_TICK_MS);
+  };
+  show(code);
+  current = code;
+  return { el, spin, get code() { return current; } };
+}
+
+const gateOf = (p) => (p.repo === LAB ? '회사' : '개인');
+
+/** 프로젝트 한 줄. 최신 핸드오프를 읽어 미결과 다음 할 일을 알아낸다 */
+function towerItem(store, p, code, onSelect) {
+  const state = { hasOpen: p.latestHandover ? null : false, card: null, fig: null, error: null, todayCount: 0, todayTitle: null, tasksLoaded: false };
   const pill = h('span', { class: 'tw-pill' });
-  const line = h('span', { class: 'tw-line' });
+  const now = h('span', { class: 'tw-now' });
+  const board = flapBoard(code);
   const el = h(
     'button',
-    { type: 'button', class: 'tw-item', 'aria-expanded': 'false', onclick: () => onSelect(item) },
-    h('span', { class: 'tw-top' }, flap(flightPrefix(p)), pill),
-    h('span', { class: 'tw-name' }, p.label),
-    line
+    { type: 'button', class: 'tw-row', 'aria-expanded': 'false', onclick: () => onSelect(item) },
+    h('span', { class: 'tw-code' }, board.el),
+    h('span', { class: 'tw-dest' }, p.label),
+    now,
+    h('span', { class: 'tw-gate' }, gateOf(p)),
+    h('span', { class: 'tw-st' }, pill)
   );
-  const item = { p, el, state, update };
+  const item = { p, el, state, update, board };
 
   function update() {
     const s = towerStatus({ paused: p.paused, todayCount: state.todayCount, hasOpen: state.tasksLoaded ? state.hasOpen : null, lastDate: p.lastDate }, today());
     el.dataset.status = s;
     pill.className = `tw-pill st-${s}`;
-    pill.textContent = TOWER_LABEL[s];
-    const bits = [];
-    if (state.todayCount) bits.push(`오늘 ${state.todayCount}장`);
-    if (state.card?.open.length) bits.push(`미결 ${state.card.open.length}`);
-    if (state.error) bits.push('핸드오프 못 읽음');
-    bits.push(p.lastDate ? `마지막 ${koDate(p.lastDate)}` : '활동 기록 없음');
-    line.textContent = bits.join(', ');
+    pill.textContent = s === 'delayed' && state.card?.open.length ? `${TOWER_LABEL[s]} (미결 ${state.card.open.length})` : TOWER_LABEL[s];
+    now.textContent = state.error ? '핸드오프를 읽지 못했어요' : towerNowText({ todayTitle: state.todayTitle, card: state.card, lastDate: p.lastDate });
   }
 
   // item.update 는 관제탑이 덮어써(운항 정보 다시 그리기) 쓰므로 늘 item.update 로 부른다
@@ -91,7 +133,7 @@ function towerDetail(item, retry) {
   const head = h(
     'div',
     { class: 'twd-head' },
-    flap(flightPrefix(p)),
+    flap(item.board.code),
     h('a', { href: folderHref(p) }, h('h3', null, p.label)),
     h('span', { class: `tw-pill st-${item.el.dataset.status}` }, TOWER_LABEL[item.el.dataset.status]),
     h('span', { class: 'twd-date' }, p.lastDate ? `마지막 ${koDate(p.lastDate)}` : '')
@@ -116,27 +158,47 @@ function towerDetail(item, retry) {
   );
 }
 
-/** 유튜브 영상 칸. 진행 막대와 다음 단계. 누르면 영상 자동화 화면(정비 점검표) */
+/** 유튜브 영상 한 줄. 편명은 YT + 다음 단계 번호(T6 이면 YT6), 상태는 진행(13 / 28). 누르면 영상 자동화 화면(정비 점검표) */
 function videoItem(store, catalog) {
   const doc = catalog.allDocs.find((d) => d.repo === VIDEO_REPO && d.path === VIDEO_TASKS_PATH);
-  const body = h('span', { class: 'tw-video-body' }, skeleton(2));
-  const el = h('a', { class: 'tw-item tw-video', href: '#/video' }, h('span', { class: 'tw-top' }, flap('YT'), h('span', { class: 'tw-pill st-waiting' }, '정비 중')), h('span', { class: 'tw-name' }, '유튜브 영상 만들기'), body);
+  const board = flapBoard('YT0');
+  const now = h('span', { class: 'tw-now' }, h('span', { class: 'skeleton-line' }));
+  const pill = h('span', { class: 'tw-pill st-checking' }, TOWER_LABEL.checking);
+  const el = h(
+    'a',
+    { class: 'tw-row tw-video', href: '#/video' },
+    h('span', { class: 'tw-code' }, board.el),
+    h('span', { class: 'tw-dest' }, '유튜브 영상 만들기'),
+    now,
+    h('span', { class: 'tw-gate' }, '개인'),
+    h('span', { class: 'tw-st' }, pill)
+  );
+  const item = { el, board };
   if (!doc) {
-    body.replaceChildren(h('span', { class: 'tw-line' }, '작업 목록을 아직 올리지 않았어요'));
-    return el;
+    now.textContent = '작업 목록을 아직 올리지 않았어요';
+    pill.className = 'tw-pill st-waiting';
+    pill.textContent = TOWER_LABEL.waiting;
+    return item;
   }
   const load = async () => {
-    body.replaceChildren(skeleton(2));
     try {
       const { groups, progress } = parseTaskList(await store.text(VIDEO_REPO, doc.sha));
       const it = nextUp(groups);
-      body.replaceChildren(progressBar(progress), it ? h('span', { class: 'tw-line' }, `다음 ${it.id ?? ''} ${it.title} (${STATUS_LABEL[it.status]})`) : h('span', { class: 'tw-line' }, '모든 단계를 끝냈어요'));
+      now.textContent = it ? `${it.id ?? ''} ${it.title}`.trim() : '모든 단계를 끝냈어요';
+      const done = progress.total > 0 && progress.done >= progress.total;
+      pill.className = `tw-pill ${done ? 'st-arrived' : 'st-delayed'}`;
+      pill.textContent = done ? TOWER_LABEL.arrived : `정비 ${progress.done} / ${progress.total}`;
+      const num = String(it?.id ?? '').replace(/\D/g, '').slice(0, 1) || '0';
+      board.spin(`YT${num}`);
+      if (it) el.title = `다음 단계 ${STATUS_LABEL[it.status]}`;
     } catch (e) {
-      body.replaceChildren(h('span', { class: 'tw-line tw-error' }, `작업 목록을 읽지 못했어요 (${errorText(e)})`));
+      now.textContent = `작업 목록을 읽지 못했어요 (${errorText(e)})`;
+      pill.className = 'tw-pill st-cancelled';
+      pill.textContent = '못 읽음';
     }
   };
   void load();
-  return el;
+  return item;
 }
 
 function towerSection(store, catalog) {
@@ -155,20 +217,39 @@ function towerSection(store, catalog) {
     detail.replaceChildren(towerDetail(item, () => location.reload()));
   };
   const items = [];
-  const rows = groups.map((g) => {
-    if (g.error) return h('div', { class: 'tw-group' }, h('h3', null, g.label), failure(`이 저장소를 읽지 못했어요 (${errorText(g.error)})`, () => location.reload()));
-    const its = g.projects.map((p) => towerItem(store, p, select));
-    items.push(...its);
-    return h(
-      'div',
-      { class: 'tw-group' },
-      h('h3', null, g.label),
-      its.length ? h('div', { class: 'tw-strip' }, its.map((i) => i.el)) : empty('문서가 없어요'),
-      g.archived.length
-        ? h('details', { class: 'tw-archived' }, h('summary', null, `보관 중 ${g.archived.length}`), h('ul', null, g.archived.map((p) => h('li', null, h('a', { href: folderHref(p) }, p.label), p.lastDate ? ` 마지막 ${koDate(p.lastDate)}` : ''))))
-        : null
-    );
-  });
+  const codeCount = new Map();
+  const nextCode = (p) => {
+    const prefix = flightPrefix(p);
+    const n = (codeCount.get(prefix) ?? 0) + 1;
+    codeCount.set(prefix, n);
+    return `${prefix}${n % 10}`;
+  };
+  const failures = [];
+  const archived = [];
+  for (const g of groups) {
+    if (g.error) failures.push(failure(`${g.label} 저장소를 읽지 못했어요 (${errorText(g.error)})`, () => location.reload()));
+    items.push(...g.projects.map((p) => towerItem(store, p, nextCode(p), select)));
+    archived.push(...g.archived);
+  }
+  const video = videoItem(store, catalog);
+  const head = h('div', { class: 'tw-row tw-head', 'aria-hidden': 'true' }, h('span', null, '편명'), h('span', null, '목적지 (프로젝트)'), h('span', null, '지금 할 일'), h('span', { class: 'tw-gate' }, '게이트'), h('span', null, '상태'));
+  const table = h('div', { class: 'tw-table', role: 'list' }, head, video.el, items.map((i) => i.el));
+  const rows = [
+    failures,
+    table, // 프로젝트가 없어도 유튜브 영상 줄은 늘 보인다(codex P2 11-26)
+    items.length ? null : empty('프로젝트가 없어요'),
+    archived.length
+      ? h('details', { class: 'tw-archived' }, h('summary', null, `보관 중 ${archived.length}`), h('ul', null, archived.map((p) => h('li', null, h('a', { href: folderHref(p) }, p.label), p.lastDate ? ` 마지막 ${koDate(p.lastDate)}` : ''))))
+      : null,
+  ];
+  // 몇 초마다 안내판 전체가 위에서부터 한 줄씩 차례로 "촤르르" 돌다 제 편명에 멈춘다. 다른 화면으로 가면 멈춘다
+  const boards = [video.board, ...items.map((i) => i.board)];
+  const flipAll = () => boards.forEach((b, i) => setTimeout(() => b.spin(b.code), i * FLAP_ROW_GAP_MS));
+  const loop = setInterval(() => {
+    if (!table.isConnected) return clearInterval(loop);
+    flipAll();
+  }, FLAP_EVERY_MS);
+  setTimeout(flipAll, 600); // 처음 열 때 한 번
   // 운항 정보를 연 채 핸드오프가 늦게 도착하면 다시 그린다
   for (const it of items) {
     const orig = it.update;
@@ -180,17 +261,22 @@ function towerSection(store, catalog) {
   const section = h(
     'section',
     { class: 'tower', 'aria-label': '관제탑' },
-    boardTitle('관제탑', h('small', null, '프로젝트를 누르면 운항 정보')),
-    h('div', { class: 'tw-group' }, h('h3', null, '정비'), h('div', { class: 'tw-strip' }, videoItem(store, catalog))),
+    boardTitle('출발 Departures', h('small', null, '관제탑, 줄을 누르면 운항 정보')),
     rows,
     detail
   );
   /** 탑승권 레일이 오늘 할 일을 다 읽으면 프로젝트마다 오늘 몇 장인지 알려 준다 */
   const setPasses = ({ passes }) => {
     const counts = new Map();
-    for (const p of passes) if (p.project) counts.set(p.project.id, (counts.get(p.project.id) ?? 0) + 1);
+    const firstTitle = new Map();
+    for (const p of passes) {
+      if (!p.project) continue;
+      counts.set(p.project.id, (counts.get(p.project.id) ?? 0) + 1);
+      if (!firstTitle.has(p.project.id)) firstTitle.set(p.project.id, p.task.title);
+    }
     for (const it of items) {
       it.state.todayCount = counts.get(it.p.id) ?? 0;
+      it.state.todayTitle = firstTitle.get(it.p.id) ?? null;
       it.state.tasksLoaded = true;
       if (it.state.hasOpen === null && !it.p.latestHandover) it.state.hasOpen = false;
       it.update();

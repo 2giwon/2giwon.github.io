@@ -2,6 +2,43 @@
 // 용어는 personal-docs/2giwon.github.io/terminology.md (탑승권, 머리띠 상태, 편명, 관제탑 띠)
 
 import { LAB } from './catalog.mjs';
+import { koDate } from './dom.mjs';
+
+/** 글자판이 도는 동안 보여 줄 글자들 */
+export const FLAP_ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+const FLAP_SPIN = 5; // 첫 글자가 멈추기 전까지 도는 횟수
+const FLAP_STAGGER = 3; // 다음 글자는 이만큼 더 돌고 멈춘다(왼쪽부터 차례로 "촤르르")
+
+/**
+ * 전광판 글자판이 바뀌는 그림판(프레임) 목록. 글자마다 아무 글자나 돌다가 왼쪽부터 차례로 제 글자에 멈춘다.
+ * 마지막 그림판은 늘 목표 글자다. rnd 는 테스트에서 정해진 값을 넣으려고 받는다
+ */
+export function flapFrames(target, rnd = Math.random) {
+  const chars = [...String(target)];
+  const total = FLAP_SPIN + FLAP_STAGGER * Math.max(0, chars.length - 1) + 1;
+  const frames = [];
+  for (let k = 0; k < total; k += 1) {
+    frames.push(
+      chars
+        .map((c, i) => {
+          if (k >= FLAP_SPIN + FLAP_STAGGER * i) return c;
+          const pool = FLAP_ALPHA.replace(c, ''); // 멈추기 전에는 제 글자가 나오지 않게(멈추는 순간이 또렷하게)
+          return pool[Math.floor(rnd() * pool.length) % pool.length];
+        })
+        .join('')
+    );
+  }
+  frames[frames.length - 1] = chars.join('');
+  return frames;
+}
+
+/** 관제탑 안내판의 "지금 할 일" 칸. 오늘 할 일 → 최신 핸드오프의 다음 할 일 → 지금 상태 → 소식 없음 */
+export function towerNowText({ todayTitle, card, lastDate }) {
+  if (todayTitle) return todayTitle;
+  if (card?.next?.length) return card.next[0];
+  if (card?.state?.length) return card.state[0];
+  return lastDate ? `${koDate(lastDate)} 이후 소식 없음` : '소식 없음';
+}
 
 const ARRIVED_DAYS = 7;
 

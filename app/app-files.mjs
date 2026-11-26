@@ -8,6 +8,7 @@ export const APP_FILES = [
   'app/app-files.mjs',
   'app/cache.mjs',
   'app/catalog.mjs',
+  'app/clock.mjs',
   'app/docview.mjs',
   'app/dom.mjs',
   'app/draw.mjs',

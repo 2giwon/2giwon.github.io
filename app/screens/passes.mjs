@@ -9,6 +9,7 @@ import { today } from '../store.mjs';
 import { todayView, addTask, completeTask, moveToToday, moveToLater, setStage, needsTicket, restoreTask, STAGES, STAGE_LABEL } from '../todo.mjs';
 import { boardingPasses, PASS_LABEL } from '../airport.mjs';
 import { LAB } from '../catalog.mjs';
+import { digitalClock } from '../clock.mjs';
 
 const REDMINE = 'https://redmine.wp-dev.xyz/issues/';
 const SWIPE_PX = 90;
@@ -378,12 +379,11 @@ export function passesSection(store, projects, onChange = () => {}) {
   }
 
   void load();
-  const now = new Date();
-  const clock = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   const rail = h(
     'section',
     { class: 'bp-area', 'aria-label': '오늘 탑승할 주문' },
-    h('header', { class: 'bp-head' }, h('h2', null, '오늘 탑승할 주문'), count, h('time', { class: 'bp-clock' }, clock)),
+    // 시계: 막대 7개 디지털 숫자, 가운데 : 가 1초마다 깜빡인다(11-26 사용자 요청, clock.mjs)
+    h('header', { class: 'bp-head' }, h('h2', null, '오늘 탑승할 주문'), count, digitalClock(h)),
     status,
     h('div', { class: 'bp-rail', 'aria-hidden': 'true' }),
     passesBox,
