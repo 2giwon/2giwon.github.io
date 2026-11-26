@@ -173,11 +173,57 @@ function setIcon(el, icon, label) {
   el.setAttribute('aria-label', label);
 }
 
-function go(force = false) {
-  return render(force).catch((e) => {
-    console.error('[worknote]', e);
-    document.getElementById('app').textContent = '화면을 그리지 못했습니다. 새로 고침해 주세요.';
+/**
+ * 그리기가 멈추면, 배포 직후 옛 화면 파일이 섞인 경우가 대부분이다(11-26).
+ * 이번 탭에서 처음이면 화면 파일을 모두 새로 받고 한 번 다시 연다. 그래도 멈추면 안내와 "새 버전 받기" 버튼만 보여 준다.
+ */
+async function recover(e) {
+  console.error('[worknote]', e);
+  const app = document.getElementById('app');
+  const files = await import('./app-files.mjs').catch(() => null);
+  // 저장소(sessionStorage)를 못 쓰면 끝없이 다시 열 수 있으므로 자동으로 하지 않고 버튼만 보여 준다(codex P2 11-26)
+  let auto = false;
+  try {
+    if (files && files.recoveryStep(sessionStorage.getItem(files.RECOVERY_KEY)) === 'refresh') {
+      sessionStorage.setItem(files.RECOVERY_KEY, '1');
+      auto = true;
+    }
+  } catch {
+    auto = false;
+  }
+  if (auto) {
+    app.textContent = '새 버전을 받는 중이에요…';
+    await files.refreshAppFiles();
+    location.reload();
+    return;
+  }
+  app.textContent = '화면을 그리지 못했어요. ';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'link';
+  btn.textContent = '새 버전 받고 다시 열기';
+  btn.addEventListener('click', async () => {
+    if (files) await files.refreshAppFiles();
+    location.reload();
   });
+  app.append(btn);
+}
+
+function go(force = false) {
+  return render(force)
+    .then(() => {
+      try {
+        sessionStorage.removeItem('worknote-recovered'); // 잘 그려지면 다음 배포 때 또 새로 받을 수 있게 지운다
+      } catch {
+        /* 저장소를 못 써도 화면은 그려졌다 */
+      }
+    })
+    .catch((e) =>
+      recover(e).catch((err) => {
+        console.error('[worknote]', err);
+        document.getElementById('app').textContent = '화면을 그리지 못했어요. 새로 고침해 주세요.';
+      })
+    );
 }
 
 export function start() {
