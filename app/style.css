@@ -397,6 +397,12 @@ button.primary {
 .token-form input { font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; width: 100%; }
 .form-error { color: var(--risk); font-size: 13px; margin: 0; min-height: 1em; }
 .hint { font-size: 13px; color: var(--muted); }
+
+/* 디자인 샘플(11-26, 임시). 새 디자인을 정하면 지운다 */
+.samples-page h1 { margin: 16px 0 4px; font-size: 22px; }
+.samples-tabs { display: flex; gap: 8px; margin: 12px 0 16px; }
+.samples-tab { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); text-decoration: none; font-size: 14px; }
+.samples-tab.on { background: var(--ink); border-color: var(--ink); color: var(--surface); font-weight: 600; }
 .blog-link { display: block; margin-top: 24px; text-align: center; font-weight: 600; }
 
 /* 로딩, 실패, 빈 상태 */

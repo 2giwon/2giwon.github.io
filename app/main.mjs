@@ -21,12 +21,13 @@ function modules() {
     import('./screens/media.mjs'),
     import('./screens/video.mjs'),
     import('./screens/themes.mjs'),
+    import('./screens/samples.mjs'),
   ]);
 }
 
 async function render(force = false) {
   const seq = ++renderSeq;
-  const [dom, storeMod, tokenMod, dashMod, docMod, folderMod, cacheMod, mediaMod, videoMod, themesMod] = await modules();
+  const [dom, storeMod, tokenMod, dashMod, docMod, folderMod, cacheMod, mediaMod, videoMod, themesMod, samplesMod] = await modules();
   if (seq !== renderSeq) return;
   const { h, failure, errorText } = dom;
   const root = document.getElementById('app');
@@ -87,6 +88,8 @@ async function render(force = false) {
         'span',
         { class: 'tools' },
         iconButton(h, { icon: 'folder', label: '폴더', href: '#/folders' }),
+        // 디자인 샘플(11-26, 임시). 새 디자인을 확정하면 이 줄과 samples 화면을 지운다
+        iconButton(h, { icon: 'palette', label: '디자인 샘플 (임시)', href: '#/samples' }),
         iconButton(h, { icon: 'refresh', label: '새로 고침', onclick: () => void go(true) }),
         themeButton(h),
         clearBtn,
@@ -138,6 +141,7 @@ async function render(force = false) {
   else if (route.name === 'media') content.replaceChildren(mediaMod.mediaScreen(store, route.repo, route.folder));
   else if (route.name === 'video') content.replaceChildren(videoMod.videoScreen(store, catalog));
   else if (route.name === 'themes') content.replaceChildren(themesMod.themesScreen(store));
+  else if (route.name === 'samples') content.replaceChildren(samplesMod.samplesScreen(store, route.sample));
   else content.replaceChildren(dashMod.dashboardScreen(store, catalog));
   window.scrollTo(0, 0);
 }

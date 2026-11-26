@@ -18,6 +18,7 @@ import {
   THEME_REQUEST_PATH,
   THEME_STATUS_PATH,
 } from './themes.mjs';
+import { SAMPLES_REPO, samplePath } from './samples.mjs';
 
 const FALLBACK_KINDS = new Set(['network', 'rate_limited', 'unknown']);
 const treeKey = (repo) => `worknote.tree.${repo}`;
@@ -261,6 +262,11 @@ export function createStore({
     themePreview,
     themeSnapshot,
     requestTheme,
+    /** 디자인 샘플 HTML 글(11-26, 임시). 파일이 없으면 null */
+    async sampleHtml(id) {
+      const file = await gh.readFile(SAMPLES_REPO, samplePath(id));
+      return file ? file.text : null;
+    },
     /** 토큰 지우기. 이후 도착하는 응답은 저장하지 않는다. */
     dispose() {
       disposed = true;
