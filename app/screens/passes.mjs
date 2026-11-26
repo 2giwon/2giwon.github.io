@@ -7,9 +7,9 @@
 import { h, skeleton, failure, empty, errorText } from '../dom.mjs';
 import { today } from '../store.mjs';
 import { todayView, addTask, completeTask, moveToToday, moveToLater, setStage, needsTicket, restoreTask, STAGES, STAGE_LABEL } from '../todo.mjs';
-import { boardingPasses, PASS_LABEL } from '../airport.mjs';
+import { boardingPasses, PASS_LABEL, flapFrames } from '../airport.mjs';
 import { LAB } from '../catalog.mjs';
-import { digitalClock } from '../clock.mjs';
+import { nowWorldClock, offWorkClock } from '../clock.mjs';
 
 const REDMINE = 'https://redmine.wp-dev.xyz/issues/';
 const SWIPE_PX = 90;
@@ -77,6 +77,51 @@ function saveErrorText(e) {
   return String(e?.message ?? e);
 }
 
+const FLAP_TICK_MS = 45; // 글자판 한 장 넘기는 간격
+const FLAP_EVERY_MS = 9000; // 탑승권 편명도 이만큼마다 한 장씩 차례로 촤르르
+const FLAP_PASS_GAP_MS = 160; // 탑승권과 탑승권 사이 시간차
+const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/**
+ * 전광판 글자판 하나(LM1 처럼 여러 칸). spin(새 글자) 로 스플릿 플랩 전광판처럼 촤르르 돌다 멈춘다(11-26 사용자 요청).
+ * 탑승권 머리띠와 출발 안내판(dashboard.mjs) 이 함께 쓴다
+ */
+export function flapBoard(code, cls = 'board-flap') {
+  const el = h('span', { class: `flap ${cls}`, 'aria-label': `편명 ${code}` });
+  let current = '';
+  let timer = 0;
+  const show = (text) => {
+    const cells = [...text];
+    while (el.children.length < cells.length) el.append(h('i', { 'aria-hidden': 'true' }));
+    while (el.children.length > cells.length) el.lastChild.remove();
+    cells.forEach((c, i) => {
+      const cell = el.children[i];
+      if (cell.textContent !== c) {
+        cell.textContent = c;
+        cell.classList.remove('tick');
+        void cell.offsetWidth; // 같은 칸이 연달아 바뀌어도 넘기는 움직임이 다시 보이게
+        cell.classList.add('tick');
+      }
+    });
+  };
+  const spin = (target) => {
+    clearInterval(timer);
+    el.setAttribute('aria-label', `편명 ${target}`);
+    current = target;
+    if (reducedMotion() || !el.isConnected) return show(target);
+    const frames = flapFrames(target);
+    let k = 0;
+    timer = setInterval(() => {
+      show(frames[k]);
+      k += 1;
+      if (k >= frames.length) clearInterval(timer);
+    }, FLAP_TICK_MS);
+  };
+  show(code);
+  current = code;
+  return { el, spin, get code() { return current; } };
+}
+
 /** 글자판 모양 편명(LM1) */
 export function flap(code, flip = false) {
   return h('span', { class: `flap${flip ? ' flip' : ''}`, 'aria-label': `편명 ${code}` }, [...code].map((c) => h('i', { 'aria-hidden': 'true' }, c)));
@@ -104,6 +149,18 @@ export function passesSection(store, projects, onChange = () => {}) {
   let flipped = null; // 뒷면을 보고 있는 할 일 id
   let adding = false;
   let queuedUndo = null; // 다른 저장 중에 누른 되돌리기. 저장이 끝나면 이어서 한다(codex P2 11-26)
+  // 탑승권 머리띠 편명 글자판. 다시 그릴 때마다 새로 모으고, 몇 초마다 한 장씩 차례로 촤르르 돈다(11-26 사용자 요청)
+  let passBoards = [];
+  const passBoard = (code) => {
+    const b = flapBoard(code, 'pass-flap');
+    passBoards.push(b);
+    return b.el;
+  };
+  const flipPasses = () => passBoards.forEach((b, i) => setTimeout(() => b.spin(b.code), i * FLAP_PASS_GAP_MS));
+  const flipLoop = setInterval(() => {
+    if (data && !passesBox.isConnected) return clearInterval(flipLoop); // 다른 화면으로 가면 멈춘다
+    flipPasses();
+  }, FLAP_EVERY_MS);
   const stacked = () => typeof matchMedia === 'function' && matchMedia('(max-width: 759px)').matches;
   // 발권 칸에 쓰던 값. 다시 그려도(저장 실패 포함) 남아 있고, 발권이 성공했을 때만 비운다(codex P2 11-11)
   const draft = { title: '', stage: 'normal', when: 'today' };
@@ -252,7 +309,7 @@ export function passesSection(store, projects, onChange = () => {}) {
     const front = h(
       'div',
       { class: 'bp-front' },
-      h('div', { class: 'bp-band' }, flap(p.code, p.status === 'boarding'), h('span', { class: 'bp-state' }, p.status === 'delayed' ? `${PASS_LABEL.delayed} ${p.carryDays}일째` : PASS_LABEL[p.status])),
+      h('div', { class: 'bp-band' }, passBoard(p.code), h('span', { class: 'bp-state' }, p.status === 'delayed' ? `${PASS_LABEL.delayed} ${p.carryDays}일째` : PASS_LABEL[p.status])),
       h(
         'div',
         { class: 'bp-body' },
@@ -326,6 +383,7 @@ export function passesSection(store, projects, onChange = () => {}) {
     const v = todayView(data.tasks, today());
     const passes = boardingPasses(v.today, projects);
     count.textContent = `${passes.length}장`;
+    passBoards = [];
     passesBox.replaceChildren(...(passes.length ? passes.map(passEl) : [h('div', { class: 'bp bp-empty' }, h('p', null, '오늘 탑승할 주문이 없어요'), h('small', null, '나중에 목록에서 오늘로 옮기거나 새로 발권해요'))]), addTile());
 
     doneBox.replaceChildren(
@@ -369,6 +427,7 @@ export function passesSection(store, projects, onChange = () => {}) {
       }
       data = r.data;
       draw();
+      setTimeout(flipPasses, 900); // 처음 열 때 한 번
       if (r.state === 'missing') passesBox.prepend(empty('할 일 파일이 아직 없어요. 첫 탑승권을 발권하면 만들어져요'));
     } catch (e) {
       count.textContent = '';
@@ -382,8 +441,8 @@ export function passesSection(store, projects, onChange = () => {}) {
   const rail = h(
     'section',
     { class: 'bp-area', 'aria-label': '오늘 탑승할 주문' },
-    // 시계: 막대 7개 디지털 숫자, 가운데 : 가 1초마다 깜빡인다(11-26 사용자 요청, clock.mjs)
-    h('header', { class: 'bp-head' }, h('h2', null, '오늘 탑승할 주문'), count, digitalClock(h)),
+    // 시계 두 개(세계 시계처럼): 서울 지금(노랑), 퇴근까지(빨강, 퇴근 뒤 초록). 막대 7개 숫자, : 가 1초마다 깜빡인다(11-26 사용자 요청, clock.mjs)
+    h('header', { class: 'bp-head' }, h('h2', null, '오늘 탑승할 주문'), count, h('span', { class: 'dc-pair' }, nowWorldClock(h), offWorkClock(h))),
     status,
     h('div', { class: 'bp-rail', 'aria-hidden': 'true' }),
     passesBox,

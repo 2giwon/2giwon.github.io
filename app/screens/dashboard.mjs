@@ -7,13 +7,13 @@
 
 import { h, skeleton, failure, empty, errorText, koDate } from '../dom.mjs';
 import { handoverCard } from '../handover.mjs';
-import { passesSection, flap } from './passes.mjs';
+import { passesSection, flap, flapBoard } from './passes.mjs';
 import { recentTimeline } from '../timeline.mjs';
 import { timelineChart } from '../draw.mjs';
 import { today } from '../store.mjs';
 import { iconSvg } from '../icons.mjs';
 import { loadThemeBanner } from '../themes.mjs';
-import { towerStatus, flightPrefix, TOWER_LABEL, flapFrames, towerNowText } from '../airport.mjs';
+import { towerStatus, flightPrefix, TOWER_LABEL, towerNowText } from '../airport.mjs';
 import { VIDEO_REPO, VIDEO_TASKS_PATH, STATUS_LABEL, parseTaskList, nextUp } from '../video.mjs';
 import { LAB } from '../catalog.mjs';
 
@@ -37,47 +37,8 @@ const boardTitle = (text, extra = null) => h('h2', { class: 'board-title' }, h('
 // ─── 관제탑: 출발 안내판 표(11-26 사용자 요청, 샘플 H 모양) ───────────────────
 // 열: 편명, 목적지(프로젝트), 지금 할 일, 게이트, 상태. 편명 글자판은 몇 초마다 전광판처럼 "촤르르" 돌다 멈춘다.
 
-const FLAP_TICK_MS = 45; // 글자판 한 장 넘기는 간격
 const FLAP_EVERY_MS = 9000; // 이만큼마다 안내판 전체가 한 줄씩 차례로 촤르르
 const FLAP_ROW_GAP_MS = 140; // 줄과 줄 사이 시간차
-const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-/** 전광판 글자판 하나(LM1 처럼 여러 칸). spin(새 글자) 로 촤르르 돌다 멈춘다 */
-function flapBoard(code) {
-  const el = h('span', { class: 'flap board-flap', 'aria-label': `편명 ${code}` });
-  let current = '';
-  let timer = 0;
-  const show = (text) => {
-    const cells = [...text];
-    while (el.children.length < cells.length) el.append(h('i', { 'aria-hidden': 'true' }));
-    while (el.children.length > cells.length) el.lastChild.remove();
-    cells.forEach((c, i) => {
-      const cell = el.children[i];
-      if (cell.textContent !== c) {
-        cell.textContent = c;
-        cell.classList.remove('tick');
-        void cell.offsetWidth; // 같은 칸이 연달아 바뀌어도 넘기는 움직임이 다시 보이게
-        cell.classList.add('tick');
-      }
-    });
-  };
-  const spin = (target) => {
-    clearInterval(timer);
-    el.setAttribute('aria-label', `편명 ${target}`);
-    current = target;
-    if (reducedMotion() || !el.isConnected) return show(target);
-    const frames = flapFrames(target);
-    let k = 0;
-    timer = setInterval(() => {
-      show(frames[k]);
-      k += 1;
-      if (k >= frames.length) clearInterval(timer);
-    }, FLAP_TICK_MS);
-  };
-  show(code);
-  current = code;
-  return { el, spin, get code() { return current; } };
-}
 
 const gateOf = (p) => (p.repo === LAB ? '회사' : '개인');
 

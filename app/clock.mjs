@@ -14,6 +14,7 @@ export const SEGMENTS = {
   7: 'abc',
   8: 'abcdefg',
   9: 'abcdfg',
+  '-': 'g',
 };
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -47,23 +48,63 @@ export function digitSvg(digit) {
   return `<svg viewBox="0 0 14 24" aria-hidden="true" focusable="false">${polys}</svg>`;
 }
 
+const OFF_WORK = { h: 17, m: 30 }; // 퇴근 시각 오후 5시 30분(11-26 사용자)
+
+/**
+ * 퇴근까지 남은 시간. working 이면 시, 분 네 자리(남은 초는 올려서 센다), 5시 30분이 지나면 done(0000), 토요일과 일요일은 weekend(----)
+ */
+export function untilOffWork(d, off = OFF_WORK) {
+  const day = d.getDay();
+  if (day === 0 || day === 6) return { state: 'weekend', digits: '----' };
+  const end = new Date(d.getFullYear(), d.getMonth(), d.getDate(), off.h, off.m, 0, 0);
+  const ms = end - d;
+  if (ms <= 0) return { state: 'done', digits: '0000' };
+  const mins = Math.ceil(ms / 60000);
+  return { state: 'working', digits: `${pad(Math.floor(mins / 60))}${pad(mins % 60)}` };
+}
+
+const COUNTDOWN_LABEL = { working: '퇴근까지', done: '퇴근!', weekend: '주말' };
+
+/** 지금 시각 시계(노랑) */
+export function digitalClock(h, now = () => new Date()) {
+  return ledClock(h, now, (d) => ({ digits: clockDigits(d), label: `지금 ${clockDigits(d).slice(0, 2)}시 ${clockDigits(d).slice(2)}분`, tone: 'now' }));
+}
+
+/** 퇴근까지 남은 시간 시계. 일하는 동안은 빨강, 퇴근 뒤에는 초록, 주말은 흐린 회색 */
+export function offWorkClock(h, now = () => new Date()) {
+  const caption = h('span', { class: 'dc-cap' }, COUNTDOWN_LABEL.working);
+  const clock = ledClock(h, now, (d) => {
+    const r = untilOffWork(d);
+    caption.textContent = COUNTDOWN_LABEL[r.state];
+    const label = r.state === 'working' ? `퇴근까지 ${Number(r.digits.slice(0, 2))}시간 ${Number(r.digits.slice(2))}분` : COUNTDOWN_LABEL[r.state];
+    return { digits: r.digits, label, tone: r.state === 'working' ? 'off' : r.state === 'done' ? 'free' : 'rest' };
+  });
+  return h('span', { class: 'dc-world' }, caption, clock);
+}
+
+/** 세계 시계처럼 이름표를 단 지금 시각 시계 */
+export function nowWorldClock(h, now = () => new Date()) {
+  return h('span', { class: 'dc-world' }, h('span', { class: 'dc-cap' }, '서울 지금'), digitalClock(h, now));
+}
+
 /**
  * 디지털 시계 요소. 1초마다(실제 초에 맞춰) 숫자와 : 를 바꾼다. 화면에서 떨어지면(다른 화면으로 가면) 스스로 멈춘다.
- * @param {(tag:string, props?:object, ...children:any[]) => HTMLElement} h dom.mjs 의 h
+ * read(d) 가 그 순간 보여 줄 {digits, label, tone} 을 정한다. tone 은 색(now 노랑, off 빨강, free 초록, rest 회색)
  */
-export function digitalClock(h, now = () => new Date()) {
+function ledClock(h, now, read) {
   const digits = [0, 1, 2, 3].map(() => h('span', { class: 'dc-digit' }));
   const colon = h('span', { class: 'dc-colon', 'aria-hidden': 'true' }, h('i'), h('i'));
   const el = h('time', { class: 'dc', role: 'timer', 'aria-live': 'off' }, digits[0], digits[1], colon, digits[2], digits[3]);
   let shown = '';
   const draw = () => {
     const d = now();
-    const s = clockDigits(d);
-    if (s !== shown) {
+    const r = read(d);
+    const s = r.digits;
+    if (s + r.tone !== shown) {
       [...s].forEach((c, i) => (digits[i].innerHTML = digitSvg(c)));
-      el.setAttribute('aria-label', `지금 ${s.slice(0, 2)}시 ${s.slice(2)}분`);
-      el.dateTime = `${s.slice(0, 2)}:${s.slice(2)}`;
-      shown = s;
+      el.setAttribute('aria-label', r.label);
+      el.className = `dc tone-${r.tone}`;
+      shown = s + r.tone;
     }
     colon.classList.toggle('off', !colonOn(d));
   };
