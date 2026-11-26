@@ -546,13 +546,13 @@ button.primary {
 .board-title small { font-size: 12px; font-weight: 400; color: var(--muted); }
 
 /* 칸 배치. PC: 왼쪽(레일, 관제탑, 라운지) + 오른쪽(오늘 도착과 나중에, 도착 안내와 운항 기록) */
-.airport { display: grid; gap: 18px; margin-top: 16px; grid-template-columns: minmax(0, 1fr); grid-template-areas: 'rail' 'top' 'tower' 'lounge' 'bottom'; }
+.airport { display: grid; gap: 18px; margin-top: 16px; grid-template-columns: minmax(0, 1fr); grid-template-areas: 'commute' 'rail' 'top' 'tower' 'lounge' 'bottom'; }
 .ap-main, .ap-aside { display: contents; }
-.ap-rail { grid-area: rail; } .ap-top { grid-area: top; } .ap-tower { grid-area: tower; } .ap-lounge { grid-area: lounge; } .ap-bottom { grid-area: bottom; }
+.ap-rail { grid-area: rail; } .ap-top { grid-area: top; } .ap-tower { grid-area: tower; } .ap-lounge { grid-area: lounge; } .ap-bottom { grid-area: bottom; } .cm { grid-area: commute; }
 @media (min-width: 960px) {
   .airport { grid-template-columns: minmax(0, 1fr) 320px; grid-template-areas: none; align-items: start; }
   .ap-main, .ap-aside { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
-  .ap-rail, .ap-top, .ap-tower, .ap-lounge, .ap-bottom { grid-area: auto; }
+  .ap-rail, .ap-top, .ap-tower, .ap-lounge, .ap-bottom, .cm { grid-area: auto; }
 }
 .later-list { max-height: 340px; overflow-y: auto; }
 .ap-bottom, .bp-side { display: flex; flex-direction: column; gap: 14px; }
@@ -691,6 +691,23 @@ button.primary {
 .side-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
 .side-card h3 { margin: 0 0 8px; font-size: 14px; }
 .side-empty { margin: 0; font-size: 13px; color: var(--muted); }
+
+/* 귀가편 6211(11-26): 지선버스 초록 띠, 집 도착 시각은 안내판 글씨처럼 */
+.cm[hidden] { display: none; }
+.cm { border-top: 4px solid var(--st-boarding); }
+.cm h3 small { font-weight: 400; font-size: 12px; color: var(--muted); }
+.cm-lead { display: flex; flex-direction: column; gap: 2px; margin: 0 0 10px; font-size: 13px; color: var(--muted); }
+.cm-lead strong { font-size: 20px; color: var(--ink); }
+.cm-hurry { color: var(--risk-ink); font-weight: 700; }
+.cm-rows { display: flex; flex-direction: column; gap: 6px; }
+.cm-row { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; padding: 8px 10px; border-radius: 8px; background: var(--chip); font-size: 13px; }
+.cm-row b { font-family: var(--mono); font-size: 15px; white-space: nowrap; }
+.cm-row.best { background: var(--board); color: var(--flap); box-shadow: inset 3px 0 0 var(--st-boarding); }
+.cm-verdict { margin: 10px 0 0; font-weight: 700; font-size: 14px; }
+.cm-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+.cm-foot:empty { display: none; }
+.cm-check { margin-left: auto; padding: 6px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; }
+.cm-check:disabled { opacity: .5; cursor: default; }
 .done-list, .later-list, .arrivals { list-style: none; margin: 0; padding: 0; }
 .done-list li { display: flex; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
 .done-mark { color: var(--ok); font-weight: 800; }

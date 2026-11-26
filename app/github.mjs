@@ -56,9 +56,28 @@ function kindFor(res) {
   return 'unknown';
 }
 
+let writing = 0;
+/** 지금 GitHub 에 쓰는 중인 요청 수(할 일 저장, 테마 요청). 새 버전 자동 받기가 쓰는 도중 다시 열지 않게 본다(update.mjs) */
+export const pendingWrites = () => writing;
+
+/**
+ * 읽고 고쳐 쓰는 저장 전체(할 일 저장, 테마 요청)를 "쓰는 중"으로 센다. 쓰기 요청 하나만 세면
+ * 앞쪽 읽기 동안은 0이라 그 사이 새 버전 자동 받기가 페이지를 다시 열 수 있었다(리뷰 P2 11-26)
+ */
+export async function trackWrite(fn) {
+  writing += 1;
+  try {
+    return await fn();
+  } finally {
+    writing -= 1;
+  }
+}
+
 export function createGitHub({ token, fetch }) {
   async function request(path, accept = 'application/vnd.github+json', { method = 'GET', body, cache } = {}) {
     let res;
+    const write = method !== 'GET';
+    if (write) writing += 1;
     try {
       res = await fetch(API + path, {
         method,
@@ -73,6 +92,8 @@ export function createGitHub({ token, fetch }) {
       });
     } catch (e) {
       throw new GitHubError('network', null, String(e?.message ?? e));
+    } finally {
+      if (write) writing -= 1; // 응답이 왔으면(성공이든 실패든) GitHub 쪽 쓰기는 끝났다
     }
     if (!res.ok) throw new GitHubError(kindFor(res), res.status);
     return res;

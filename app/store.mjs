@@ -1,7 +1,7 @@
 // 화면이 쓰는 데이터 창구. GitHub API + 캐시 + 목록 만들기를 한곳에서 한다.
 // 파일 목록은 매번 받고, 실패하면 마지막으로 받은 목록을 꺼내 "최신이 아닐 수 있음"으로 표시한다.
 
-import { createGitHub, GitHubError } from './github.mjs';
+import { createGitHub, GitHubError, trackWrite } from './github.mjs';
 import { buildCatalog, projectIdsFor, LAB, PERSONAL } from './catalog.mjs';
 import { parseFigures, figureState } from './figures.mjs';
 import { cache as defaultCache } from './cache.mjs';
@@ -254,14 +254,15 @@ export function createStore({
     state,
     tasks,
     links,
-    updateTasks,
+    // 저장은 읽기부터 쓰기까지 전체를 "쓰는 중"으로 센다(새 버전 자동 받기가 그 사이 다시 열지 않게, 리뷰 P2 11-26)
+    updateTasks: (change, message) => trackWrite(() => updateTasks(change, message)),
     mediaIndex,
     mediaBytes,
     themeList,
     themeEnglish,
     themePreview,
     themeSnapshot,
-    requestTheme,
+    requestTheme: (...args) => trackWrite(() => requestTheme(...args)),
     /** 디자인 샘플 HTML 글(11-26). 파일이 없으면 null */
     async sampleHtml(id) {
       const file = await gh.readFile(SAMPLES_REPO, samplePath(id));

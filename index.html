@@ -13,7 +13,7 @@
      Blob 으로 감싸 재생한다. blob: 은 'self' 에 들어가지 않아서 따로 적어야 재생이 막히지 않는다.
      blob: 은 이 탭이 만든 데이터만 가리키므로 밖에서 무엇을 받아올 수 있는 통로가 아니다
      connect-src 'self': 배포 직후 옛 화면 파일이 섞여 그리기가 멈추면 같은 사이트의 화면 파일을 새로 받는다(11-26, app/app-files.mjs) -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://api.github.com; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://api.github.com https://bus-6211.giwon-note.workers.dev; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <!-- 파비콘: 블로그와 같은 남색 바탕에 체크 목록(11-11). CSP img-src 'self' 로 허용된다 -->
 <link rel="icon" href="favicon.svg" type="image/svg+xml">

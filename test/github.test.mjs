@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createGitHub, GitHubError } from '../app/github.mjs';
+import { createGitHub, GitHubError, pendingWrites, trackWrite } from '../app/github.mjs';
 
 function fakeFetch(handler) {
   const calls = [];
@@ -153,6 +153,35 @@ test('L3. readFile 은 브라우저 캐시를 그대로 쓰지 않고 GitHub 에
   const gh = createGitHub({ token: 'tk', fetch });
   await gh.readFile('personal-docs', 'todo/tasks.json');
   assert.equal(fetch.calls[0].init.cache, 'no-cache');
+});
+
+test('U6. 쓰는 동안만 pendingWrites 가 1이고, 끝나면(실패해도) 0으로 돌아온다(새 버전 자동 받기가 기다리게)', async () => {
+  let release;
+  // 쓰기(PUT)만 붙잡아 두고, 읽기는 바로 답한다
+  const fetch = fakeFetch((url, init) => (init.method === 'PUT' ? new Promise((r) => (release = r)) : res(200, { content: '', sha: 's' })));
+  const gh = createGitHub({ token: 'tk', fetch });
+  assert.equal(pendingWrites(), 0);
+  const p = gh.writeFile('personal-docs', 'todo/tasks.json', 'x', 's1', 'm');
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(pendingWrites(), 1);
+  release(res(500, {}));
+  await p.catch(() => {});
+  assert.equal(pendingWrites(), 0);
+  await gh.readFile('personal-docs', 'todo/tasks.json').catch(() => {});
+  assert.equal(pendingWrites(), 0); // 읽기는 세지 않는다
+});
+
+test('U6. trackWrite 는 읽고 쓰는 전체 동안 pendingWrites 를 올려 둔다(읽는 사이 다시 열리지 않게, 리뷰 P2 11-26)', async () => {
+  let release;
+  const p = trackWrite(() => new Promise((r) => (release = r)));
+  assert.equal(pendingWrites(), 1);
+  release('ok');
+  assert.equal(await p, 'ok');
+  assert.equal(pendingWrites(), 0);
+  await trackWrite(async () => {
+    throw new Error('x');
+  }).catch(() => {});
+  assert.equal(pendingWrites(), 0); // 실패해도 내린다
 });
 
 test('9. readFile 은 파일이 없으면(404) null', async () => {

@@ -1,0 +1,5 @@
+# 퇴근 귀가편 Worker 설정. 이 폴더에서 `npx wrangler deploy` 로 올린다.
+# 인증키는 이 파일에 쓰지 않는다. `npx wrangler secret put SEOUL_BUS_KEY` 로 Cloudflare 에만 넣는다.
+name = "bus-6211"
+main = "bus-6211.js"
+compatibility_date = "2026-11-01"

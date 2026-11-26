@@ -232,6 +232,8 @@ export function start() {
   onThemeChange(() => void import('./draw.mjs').then((d) => d.redrawForTheme()));
   window.addEventListener('hashchange', () => void go());
   void go();
+  // 새 버전이 배포되면 열어 둔 탭도 스스로 새 화면 파일로 바꾼다(11-26 사용자 요청, update.mjs)
+  void import('./update.mjs').then((u) => u.watchForUpdates()).catch((e) => console.error('[worknote]', e));
 }
 
 if (typeof document !== 'undefined') start();

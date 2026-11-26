@@ -9,6 +9,7 @@ export const APP_FILES = [
   'app/cache.mjs',
   'app/catalog.mjs',
   'app/clock.mjs',
+  'app/commute.mjs',
   'app/docview.mjs',
   'app/dom.mjs',
   'app/draw.mjs',
@@ -22,6 +23,7 @@ export const APP_FILES = [
   'app/media.mjs',
   'app/route.mjs',
   'app/samples.mjs',
+  'app/screens/commute.mjs',
   'app/screens/dashboard.mjs',
   'app/screens/doc.mjs',
   'app/screens/folders.mjs',
@@ -39,6 +41,7 @@ export const APP_FILES = [
   'app/timeline.mjs',
   'app/todo.mjs',
   'app/token.mjs',
+  'app/update.mjs',
   'app/video.mjs',
 ];
 
