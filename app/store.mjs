@@ -262,7 +262,7 @@ export function createStore({
     themePreview,
     themeSnapshot,
     requestTheme,
-    /** 디자인 샘플 HTML 글(11-26, 임시). 파일이 없으면 null */
+    /** 디자인 샘플 HTML 글(11-26). 파일이 없으면 null */
     async sampleHtml(id) {
       const file = await gh.readFile(SAMPLES_REPO, samplePath(id));
       return file ? file.text : null;

@@ -89,8 +89,8 @@ async function render(force = false) {
         'span',
         { class: 'tools' },
         iconButton(h, { icon: 'folder', label: '폴더', href: '#/folders' }),
-        // 디자인 샘플(11-26, 임시). 새 디자인을 확정하면 이 줄과 samples 화면을 지운다
-        iconButton(h, { icon: 'palette', label: '디자인 샘플 (임시)', href: '#/samples' }),
+        // 디자인 샘플(11-26). 새 디자인을 정한 뒤에도 남겨 둔다(사용자 지시 11-26)
+        iconButton(h, { icon: 'palette', label: '디자인 샘플', href: '#/samples' }),
         iconButton(h, { icon: 'refresh', label: '새로 고침', onclick: () => void go(true) }),
         themeButton(h),
         clearBtn,

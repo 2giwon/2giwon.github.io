@@ -1,6 +1,6 @@
-// 디자인 샘플 화면(11-26, 임시). personal-docs 의 샘플 HTML 을 토큰으로 읽어 그림자 영역(Shadow DOM)에 그린다.
+// 디자인 샘플 화면(11-26). personal-docs 의 샘플 HTML 을 토큰으로 읽어 그림자 영역(Shadow DOM)에 그린다.
 // 그림자 영역이라 샘플 CSS 와 작업노트 CSS 가 섞이지 않는다. 샘플의 스크립트는 지우고, 하던 일(PC 화면 크기 맞추기,
-// 메뉴 눌러 이동)만 여기서 대신한다. 디자인을 확정하면 이 파일, samples.mjs, 위 막대 링크를 같이 지운다.
+// 메뉴 눌러 이동)만 여기서 대신한다. 새 디자인을 정한 뒤에도 지우지 않는다(사용자 지시 11-26).
 
 import { h, skeleton, failure, empty, errorText } from '../dom.mjs';
 import { SAMPLES, prepareSample } from '../samples.mjs';
@@ -84,7 +84,7 @@ export function samplesScreen(store, sample) {
     'div',
     { class: 'samples-page' },
     h('h1', null, '디자인 샘플'),
-    h('p', { class: 'hint' }, '새 디자인을 고르는 동안만 두는 임시 화면이에요. 디자인을 정하면 지워요.'),
+    h('p', { class: 'hint' }, '작업노트 새 디자인을 고를 때 만든 샘플이에요. 지금 디자인은 H와 I 섞기의 섞기 2예요.'),
     tabs,
     slot
   );
