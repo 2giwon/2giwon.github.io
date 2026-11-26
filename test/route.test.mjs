@@ -41,6 +41,10 @@ test('잘못된 % 인코딩은 그대로 둔다', () => {
   });
 });
 
+test('W6. #/themes 는 테마 갤러리', () => {
+  assert.deepEqual(parseRoute('#/themes'), { name: 'themes' });
+});
+
 test('모르는 주소는 상태판', () => {
   assert.deepEqual(parseRoute('#/xyz'), { name: 'dashboard' });
 });

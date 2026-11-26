@@ -8,6 +8,16 @@ import { cache as defaultCache } from './cache.mjs';
 import { parseTasks, emptyTasks, serializeTasks, TASKS_REPO, TASKS_PATH } from './todo.mjs';
 import { parseLinks, LINKS_REPO, LINKS_PATH } from './links.mjs';
 import { parseMediaIndex, mediaPath } from './media.mjs';
+import {
+  parseMarketplace,
+  parseThemeRequest,
+  parseThemeStatus,
+  makeThemeRequest,
+  isThemeName,
+  THEME_DOCS_REPO,
+  THEME_REQUEST_PATH,
+  THEME_STATUS_PATH,
+} from './themes.mjs';
 
 const FALLBACK_KINDS = new Set(['network', 'rate_limited', 'unknown']);
 const treeKey = (repo) => `worknote.tree.${repo}`;
@@ -183,6 +193,62 @@ export function createStore({
     }
   }
 
+  // ─── 테마 갤러리 (11-26) ───
+  // 테마 목록과 미리보기는 공개 테마 저장소에서, 요청과 결과는 personal-docs 에서 읽는다. 캐시하지 않는다.
+
+  /** @returns {Promise<{state:'ok', themes:string[]} | {state:'invalid', error:string}>} 서버 실패는 throw */
+  async function themeList() {
+    const r = parseMarketplace(await gh.themeText('.claude-plugin/marketplace.json'));
+    return r.ok ? { state: 'ok', themes: r.themes } : { state: 'invalid', error: r.error };
+  }
+
+  /** 번역이 없는 테마의 영어 설명(plugin.json). 없거나 깨졌으면 null */
+  async function themeEnglish(name) {
+    if (!isThemeName(name)) return null;
+    try {
+      const d = JSON.parse(await gh.themeText(`themes/${name}/.claude-plugin/plugin.json`));
+      return typeof d?.description === 'string' ? d.description : null;
+    } catch (e) {
+      if (e instanceof GitHubError) throw e;
+      return null;
+    }
+  }
+
+  /** 미리보기 파일(mp4 또는 png) 바이트 */
+  function themePreview(name, ext) {
+    if (!isThemeName(name) || !['mp4', 'png'].includes(ext)) throw new Error(`잘못된 미리보기: ${name}.${ext}`);
+    return gh.themeBytes(`previews/${name}.${ext}`);
+  }
+
+  /**
+   * 요청과 맥 앱 결과. 결과 파일이 없으면 missing(맥 앱이 아직 연결 전), 깨졌으면 invalid.
+   * @returns {Promise<{request:{theme:string, requestedAt:string}|null, status:{state:'ok', data:object}|{state:'missing'}|{state:'invalid', error:string}}>}
+   */
+  async function themeSnapshot() {
+    const [req, st] = await Promise.all([
+      gh.readFile(THEME_DOCS_REPO, THEME_REQUEST_PATH),
+      gh.readFile(THEME_DOCS_REPO, THEME_STATUS_PATH),
+    ]);
+    const request = req ? parseThemeRequest(req.text) : null;
+    if (!st) return { request, status: { state: 'missing' } };
+    const r = parseThemeStatus(st.text);
+    return { request, status: r.ok ? { state: 'ok', data: r.data } : { state: 'invalid', error: r.error } };
+  }
+
+  /** 테마 요청을 쓴다. 다른 곳이 먼저 바꿔 충돌하면 다시 읽어 한 번 더. */
+  async function requestTheme(name, knownThemes, now = new Date()) {
+    const text = makeThemeRequest(name, knownThemes, now);
+    for (let attempt = 0; ; attempt += 1) {
+      if (disposed) throw new GitHubError('unauthorized', null, '토큰을 지웠습니다');
+      const cur = await gh.readFile(THEME_DOCS_REPO, THEME_REQUEST_PATH);
+      try {
+        return await gh.writeFile(THEME_DOCS_REPO, THEME_REQUEST_PATH, text, cur?.sha ?? null, `테마 요청: ${name}`);
+      } catch (e) {
+        if (!(e instanceof GitHubError && e.kind === 'conflict') || attempt >= 1) throw e;
+      }
+    }
+  }
+
   return {
     state,
     tasks,
@@ -190,6 +256,11 @@ export function createStore({
     updateTasks,
     mediaIndex,
     mediaBytes,
+    themeList,
+    themeEnglish,
+    themePreview,
+    themeSnapshot,
+    requestTheme,
     /** 토큰 지우기. 이후 도착하는 응답은 저장하지 않는다. */
     dispose() {
       disposed = true;

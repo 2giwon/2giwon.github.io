@@ -157,3 +157,52 @@ test('dispose 전에는 원문을 캐시에 저장한다', async () => {
   await new Promise((r) => setTimeout(r, 0));
   assert.equal(cache.map.get('sha1'), '원문');
 });
+
+// ─── 테마 갤러리 (11-26) ─────────────────────────────────────────────────────
+
+const marketText = (names) => JSON.stringify({ plugins: names.map((name) => ({ name })) });
+/** 정한 시간 뒤에 응답하는 가짜 fetch. 느린 네트워크를 흉내 낸다(W7) */
+const slowFetch = (ms, status, body) => async () => {
+  await new Promise((r) => setTimeout(r, ms));
+  return new Response(body, { status });
+};
+
+test('W7. themeList 는 느린 응답도 기다려 목록을 돌려준다', async () => {
+  const r = await makeStore(slowFetch(30, 200, marketText(['sky-clock', 'harvest-home']))).themeList();
+  assert.deepEqual(r, { state: 'ok', themes: ['sky-clock', 'harvest-home'] });
+});
+
+test('W7. themeList 는 빈 목록이면 ok + 빈 배열, 깨진 파일이면 invalid, 서버 실패면 throw', async () => {
+  assert.deepEqual(await makeStore(slowFetch(5, 200, marketText([]))).themeList(), { state: 'ok', themes: [] });
+  assert.equal((await makeStore(slowFetch(5, 200, '{ 깨짐')).themeList()).state, 'invalid');
+  await assert.rejects(makeStore(slowFetch(5, 500, '')).themeList());
+});
+
+test('W7. themeSnapshot 은 요청과 상태 파일을 읽는다. 없으면 missing, 깨지면 invalid', async () => {
+  const req = getFile(JSON.stringify({ version: 1, theme: 'sky-clock', requestedAt: '2026-11-26T10:00:00.000Z' }), 'r1');
+  const st = getFile(JSON.stringify({ version: 1, current: 'pixel-cafe', installed: ['pixel-cafe'], last: null }), 's1');
+  const ok = await makeStore(scriptedFetch({ gets: [req, st] })).themeSnapshot();
+  assert.deepEqual(ok.request, { theme: 'sky-clock', requestedAt: '2026-11-26T10:00:00.000Z' });
+  assert.equal(ok.status.state, 'ok');
+  assert.equal(ok.status.data.current, 'pixel-cafe');
+  const none = await makeStore(scriptedFetch({ gets: [{ status: 404 }, { status: 404 }] })).themeSnapshot();
+  assert.equal(none.request, null);
+  assert.equal(none.status.state, 'missing');
+  const bad = await makeStore(scriptedFetch({ gets: [{ status: 404 }, getFile('{ 깨짐', 's1')] })).themeSnapshot();
+  assert.equal(bad.status.state, 'invalid');
+});
+
+test('W7. requestTheme 은 요청 파일을 sha 와 함께 쓰고, 충돌하면 한 번 더 시도한다', async () => {
+  const old = getFile(JSON.stringify({ version: 1, theme: 'sky-clock', requestedAt: '2026-11-26T09:00:00.000Z' }), 'r1');
+  const fetch = scriptedFetch({
+    gets: [old, getFile('{}', 'r2')],
+    puts: [{ status: 409 }, { status: 200, body: { content: { sha: 'r3' } } }],
+  });
+  await makeStore(fetch).requestTheme('harvest-home', ['harvest-home', 'sky-clock'], new Date('2026-11-26T10:00:00Z'));
+  const puts = fetch.calls.filter((c) => c.method === 'PUT');
+  assert.equal(puts.length, 2);
+  assert.equal(puts[1].body.sha, 'r2');
+  const saved = JSON.parse(Buffer.from(puts[1].body.content, 'base64').toString('utf8'));
+  assert.equal(saved.theme, 'harvest-home');
+  assert.match(puts[1].url, /claude-theme\/request\.json$/);
+});

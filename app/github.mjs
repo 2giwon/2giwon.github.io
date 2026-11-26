@@ -2,15 +2,21 @@
 // fetch 를 주입받아 Node 테스트에서 가짜로 바꿀 수 있게 한다.
 
 import { TASKS_REPO, TASKS_PATH } from './todo.mjs';
+import { THEME_DOCS_REPO, THEME_REQUEST_PATH } from './themes.mjs';
 
 const API = 'https://api.github.com';
 const OWNER = '2giwon';
+/** 테마 갤러리가 읽는 공개 테마 저장소. 고정해 둬서 다른 저장소를 읽지 않는다 */
+const THEME_REPO = 'claudefoliothemes/claude-code-themes';
 
 /** 경로를 조각마다 인코딩한다. 슬래시는 그대로 둬야 contents API 가 하위 경로로 읽는다. */
 const encodePath = (path) => String(path).split('/').map(encodeURIComponent).join('/');
 
-/** 쓰기는 할 일 파일 한 곳만 허락한다(토큰이 쓰기 권한이라도 화면이 다른 문서를 고치지 않게, 11-11 결정) */
-const WRITABLE = new Set([`${TASKS_REPO}:${TASKS_PATH}`]);
+/**
+ * 쓰기는 정한 파일만 허락한다(토큰이 쓰기 권한이라도 화면이 다른 문서를 고치지 않게, 11-11 결정).
+ * 할 일 파일, 그리고 테마 요청 파일(11-26). 테마 결과 파일은 맥 앱만 쓴다.
+ */
+const WRITABLE = new Set([`${TASKS_REPO}:${TASKS_PATH}`, `${THEME_DOCS_REPO}:${THEME_REQUEST_PATH}`]);
 
 /** UTF-8 글 ↔ base64. contents API 는 base64 로 주고받는다(atob, btoa 는 한 바이트 글자만 다뤄 한글이 깨진다) */
 function toBase64(text) {
@@ -109,6 +115,19 @@ export function createGitHub({ token, fetch }) {
     /** 같은 경로로 바이너리(음성, 영상, 이미지)를 받는다. 화면이 Blob 으로 감싸 재생한다. */
     async rawBytes(repo, path) {
       const res = await request(`/repos/${OWNER}/${repo}/contents/${encodePath(path)}`, 'application/vnd.github.raw');
+      return res.arrayBuffer();
+    },
+
+    /**
+     * 공개 테마 저장소의 파일(목록, 설명, 미리보기). CSP 의 connect-src 를 api.github.com 하나로 유지하려고
+     * jsDelivr 대신 같은 API 로 받는다(11-26). 바이너리는 화면이 Blob 으로 감싸 재생한다.
+     */
+    async themeText(path) {
+      const res = await request(`/repos/${THEME_REPO}/contents/${encodePath(path)}`, 'application/vnd.github.raw');
+      return res.text();
+    },
+    async themeBytes(path) {
+      const res = await request(`/repos/${THEME_REPO}/contents/${encodePath(path)}`, 'application/vnd.github.raw');
       return res.arrayBuffer();
     },
 

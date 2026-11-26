@@ -188,8 +188,26 @@ test('14. 할 일 파일이 아닌 경로에는 쓰지 않는다(요청도 보�
   for (const [repo, path] of [
     ['personal-docs', 'README.md'],
     ['labmanager-docs', 'todo/tasks.json'],
+    ['personal-docs', 'claude-theme/status.json'],
   ]) {
     await assert.rejects(gh.writeFile(repo, path, 'x', 's', 'm'));
   }
   assert.equal(fetch.calls.length, 0);
+});
+
+test('테마 요청 파일(personal-docs/claude-theme/request.json)에는 쓸 수 있다', async () => {
+  const fetch = fakeFetch(() => res(200, { content: { sha: 'n1' } }));
+  const gh = createGitHub({ token: 'tk', fetch });
+  assert.equal(await gh.writeFile('personal-docs', 'claude-theme/request.json', '{}', null, '테마 요청'), 'n1');
+  assert.match(fetch.calls[0].url, /\/repos\/2giwon\/personal-docs\/contents\/claude-theme\/request\.json$/);
+});
+
+test('테마 저장소(claudefoliothemes/claude-code-themes)의 파일을 raw 로 받는다', async () => {
+  const fetch = fakeFetch(() => res(200, 'hello'));
+  const gh = createGitHub({ token: 'tk', fetch });
+  assert.equal(await gh.themeText('.claude-plugin/marketplace.json'), 'hello');
+  const buf = await gh.themeBytes('previews/harvest-home.mp4');
+  assert.equal(new TextDecoder().decode(buf), 'hello');
+  assert.match(fetch.calls[0].url, /\/repos\/claudefoliothemes\/claude-code-themes\/contents\/\.claude-plugin\/marketplace\.json$/);
+  assert.equal(fetch.calls[0].init.headers.Accept, 'application/vnd.github.raw');
 });

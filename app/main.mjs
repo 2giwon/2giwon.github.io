@@ -20,12 +20,13 @@ function modules() {
     import('./cache.mjs'),
     import('./screens/media.mjs'),
     import('./screens/video.mjs'),
+    import('./screens/themes.mjs'),
   ]);
 }
 
 async function render(force = false) {
   const seq = ++renderSeq;
-  const [dom, storeMod, tokenMod, dashMod, docMod, folderMod, cacheMod, mediaMod, videoMod] = await modules();
+  const [dom, storeMod, tokenMod, dashMod, docMod, folderMod, cacheMod, mediaMod, videoMod, themesMod] = await modules();
   if (seq !== renderSeq) return;
   const { h, failure, errorText } = dom;
   const root = document.getElementById('app');
@@ -136,6 +137,7 @@ async function render(force = false) {
   else if (route.name === 'folders') content.replaceChildren(folderMod.foldersScreen(catalog, route.repo, route.folder));
   else if (route.name === 'media') content.replaceChildren(mediaMod.mediaScreen(store, route.repo, route.folder));
   else if (route.name === 'video') content.replaceChildren(videoMod.videoScreen(store, catalog));
+  else if (route.name === 'themes') content.replaceChildren(themesMod.themesScreen(store));
   else content.replaceChildren(dashMod.dashboardScreen(store, catalog));
   window.scrollTo(0, 0);
 }

@@ -138,6 +138,29 @@ button.primary {
 .banner { margin: 12px 0 0; padding: 10px 12px; border-radius: 8px; font-size: 14px; }
 .banner.warn { background: var(--banner-warn-bg); color: var(--banner-warn-ink); }
 .banner.info { background: var(--info-bg); color: var(--info-ink); }
+.banner.ok { background: var(--ok-bg); color: var(--ok-ink); }
+.banner.risk { background: var(--risk-bg); color: var(--risk-ink); }
+
+/* 테마 갤러리 (11-26). 폰 1열, 넓은 화면 2열. 미리보기는 16:10 자리를 먼저 잡아 영상이 와도 밀리지 않는다 */
+.themes-link { display: block; text-decoration: none; color: var(--ink); font-weight: 600; }
+.themes-page h1 { margin: 4px 0 6px; font-size: 22px; }
+.theme-status { min-height: 24px; margin: 8px 0 16px; }
+.theme-status .banner { margin-top: 8px; }
+.theme-current { margin: 0; font-size: 14px; }
+.theme-grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
+@media (min-width: 760px) { .theme-grid { grid-template-columns: 1fr 1fr; } }
+.theme-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; }
+.theme-card > .skeleton { padding: 14px; }
+.theme-preview { position: relative; aspect-ratio: 16 / 10; background: var(--sk-a); display: flex; align-items: center; justify-content: center; }
+.theme-preview video, .theme-preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.theme-preview-none { color: var(--muted); font-size: 13px; }
+.theme-body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.theme-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.theme-head h2 { margin: 0; font-size: 17px; }
+.theme-badges { display: inline-flex; gap: 6px; }
+.theme-desc { margin: 0; font-size: 14px; line-height: 1.55; color: var(--muted); }
+.theme-pick { margin-top: auto; align-self: flex-start; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--brand); background: var(--brand); color: #fff; font-size: 14px; cursor: pointer; }
+.theme-pick:disabled { background: var(--chip); border-color: var(--line); color: var(--muted); cursor: default; }
 
 /* 묶음과 카드 */
 .group > h2 { display: flex; align-items: center; gap: 8px; }

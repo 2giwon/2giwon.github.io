@@ -117,6 +117,16 @@ function timelineSection(catalog) {
   );
 }
 
+/** Claude 테마 갤러리로 가는 길(11-26). 서버 값을 그리지 않는 고정 링크라 로딩 자리가 필요 없다. */
+function themesLink() {
+  return h(
+    'section',
+    { class: 'group' },
+    h('h2', null, 'Claude 테마'),
+    h('a', { class: 'card themes-link', href: '#/themes' }, '테마 갤러리 열기', h('span', { class: 'muted' }, ' 미리보기를 보고 맥의 Claude 테마를 바꿔요'))
+  );
+}
+
 /** 목록 받기 전 자리. */
 export function dashboardLoading() {
   return h(
@@ -135,6 +145,7 @@ export function dashboardScreen(store, catalog) {
     { class: 'dashboard' },
     todaySection(store),
     videoSection(store, catalog),
+    themesLink(),
     catalog.groups.map((g) => groupSection(store, g)),
     timelineSection(catalog)
   );
