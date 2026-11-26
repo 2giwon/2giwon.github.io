@@ -151,7 +151,7 @@ export function passesSection(store, projects, onChange = () => {}) {
   // 더 새로운 저장이나 읽기가 있었다는 뜻이라 버린다(늦게 온 예전 응답이 저장한 내용을 덮지 않게, codex P2 11-26)
   let seq = 0;
   let saveFailed = false; // 저장 실패 안내가 떠 있다. 다시 읽기가 이 안내를 덮거나 지우지 않는다(codex P2 11-26)
-  let refreshing = false; // 다시 읽기는 한 번에 하나만. 응답이 20초보다 늦어도 다음 읽기가 앞 응답을 계속 버리지 않게(codex P2 11-26)
+  let refreshing = false; // 다시 읽기는 한 번에 하나만. 응답이 확인 간격(10초)보다 늦어도 다음 읽기가 앞 응답을 계속 버리지 않게(codex P2 11-26)
   let busy = false;
   let toastTimer = null;
   let flipped = null; // 뒷면을 보고 있는 할 일 id
@@ -454,7 +454,7 @@ export function passesSection(store, projects, onChange = () => {}) {
 
   /**
    * 실시간 갱신(11-26 사용자 요청). /todo 나 다른 기기에서 할 일을 바꾸면 새로 고침 없이 레일에 나타난다.
-   * 20초마다, 그리고 화면으로 돌아오는 순간 할 일 파일을 다시 읽고 지문이 바뀌었을 때만 다시 그린다(live.mjs).
+   * 10초마다, 그리고 화면으로 돌아오는 순간 할 일 파일을 다시 읽고 지문이 바뀌었을 때만 다시 그린다(live.mjs).
    * 저장 중, 발권 칸에 쓰는 중, 탑승권을 미는 중, 뒷면 칸을 만지는 중에는 건드리지 않는다.
    * 실패하면 화면은 그대로 두고 상태 줄에 알리며, 다음 확인이 성공하면 안내를 지운다.
    */
@@ -504,7 +504,7 @@ export function passesSection(store, projects, onChange = () => {}) {
     draw();
     passesBox.scrollLeft = left;
   }
-  // 화면에 한 번 붙은 뒤 떨어지면(다른 화면으로 가면) 20초 반복과 탭 전환 알림을 함께 치운다.
+  // 화면에 한 번 붙은 뒤 떨어지면(다른 화면으로 가면) 10초 반복과 탭 전환 알림을 함께 치운다.
   // 첫 읽기가 실패했어도 치운다(data 와 무관하게, codex P2 11-26)
   let attached = false;
   const gone = () => {
@@ -521,7 +521,7 @@ export function passesSection(store, projects, onChange = () => {}) {
     if (!gone() && !document.hidden) void refresh();
   };
   document.addEventListener('visibilitychange', onVisible);
-  // 상태판은 이 칸을 만든 바로 뒤 화면에 붙인다. 그 직후 붙었는지 기록해 둬야 20초 안에 떠나도 치운다(codex P2 11-26)
+  // 상태판은 이 칸을 만든 바로 뒤 화면에 붙인다. 그 직후 붙었는지 기록해 둬야 첫 확인 전에 떠나도 치운다(codex P2 11-26)
   setTimeout(gone, 0);
 
   void load();

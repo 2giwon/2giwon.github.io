@@ -21,6 +21,6 @@ test('L2. 파일 지문(sha)이 바뀌었을 때만 다시 그린다', () => {
   assert.equal(tasksChanged(null, null), false);
 });
 
-test('L4. 다시 읽는 간격은 20초', () => {
-  assert.equal(LIVE_MS, 20000);
+test('L4. 다시 읽는 간격은 10초(11-26 사용자 요청으로 20초에서 줄임)', () => {
+  assert.equal(LIVE_MS, 10000);
 });
