@@ -15,47 +15,58 @@ const SWIPE_PX = 90;
 const UNDO_MS = 5000;
 
 /**
- * 레일을 옆으로 넘기면 집게에 매달린 탑승권이 흔들리다 멈춘다(11-26 사용자 요청).
- * 넘긴 거리만큼 반대쪽으로 밀어 주고, 용수철처럼 줄어들며 제자리로 돌아온다. 각도는 레일의 --swing 값으로 넘기고
- * 탑승권마다 --k 를 곱해 조금씩 다르게 흔들린다(style.css). 움직임 줄이기 설정이면 흔들지 않는다.
+ * 레일을 옆으로 넘기면 집게에 매달린 탑승권이 실제 종이처럼 흔들린다(11-26 사용자 요청).
+ * - 움직이는 동안: 넘기는 속도에 비례해 반대쪽으로 처지며 따라온다(빠를수록 더 기운다)
+ * - 멈추면: 제자리를 살짝 지나쳤다가 금방 가라앉는다
+ * 처음 만든 방식(스크롤할 때마다 밀어 주기)은 움직이는 동안엔 거의 안 기울고 멈춘 뒤에야 크게 흔들려 부자연스러웠다(사용자 지적).
+ * 그래서 화면 한 장(프레임)마다 레일의 속도를 재고, 그 속도가 정한 "목표 기울기"를 용수철로 따라가게 했다.
+ * 각도는 레일의 --swing 값으로 넘기고 탑승권마다 --k 를 곱해 조금씩 다르게 흔들린다(style.css). 움직임 줄이기 설정이면 흔들지 않는다.
  */
 function swingOnScroll(box) {
   if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const MAX = 6; // 도
-  let last = box.scrollLeft;
+  const MAX = 7; // 도
+  const DRAG = 0.45; // 속도 1px/프레임 당 기울기(도)
+  const STIFF = 0.1; // 목표로 당기는 힘(작을수록 천천히 흔들린다)
+  const DAMP = 0.86; // 흔들림이 줄어드는 정도(작을수록 빨리 가라앉는다)
+  let lastPos = box.scrollLeft;
+  let speed = 0;
   let angle = 0;
   let vel = 0;
   let raf = 0;
-  // 사람이 넘긴 스크롤에만 흔든다. 탑승권이 기울면 레일 폭이 바뀌어 스크롤 사건이 다시 생기는데,
+  // 사람이 넘긴 스크롤에만 흔든다. 탑승권이 기울면 레일 폭이 바뀌어 스크롤 위치가 저절로 바뀔 수 있는데,
   // 그것까지 흔들면 기울기가 끝없이 커진다(11-26 실제로 확인)
   let userUntil = 0;
-  const touched = () => (userUntil = performance.now() + 400);
+  const kick = () => {
+    if (!raf) {
+      lastPos = box.scrollLeft;
+      raf = requestAnimationFrame(step);
+    }
+  };
+  const touched = () => {
+    userUntil = performance.now() + 500;
+    kick();
+  };
   for (const ev of ['wheel', 'pointerdown', 'pointermove', 'touchmove', 'keydown']) box.addEventListener(ev, touched, { passive: true });
-  const step = () => {
-    vel += -angle * 0.06; // 제자리로 당기는 힘(작을수록 천천히 흔들린다)
-    vel *= 0.92; // 공기 저항
+
+  function step() {
+    const pos = box.scrollLeft;
+    const moved = performance.now() < userUntil ? pos - lastPos : 0;
+    lastPos = pos;
+    speed = speed * 0.6 + moved * 0.4; // 속도를 부드럽게(트랙패드의 들쭉날쭉한 값 정리)
+    const target = Math.max(-MAX, Math.min(MAX, -speed * DRAG));
+    vel = (vel + (target - angle) * STIFF) * DAMP;
     angle = Math.max(-MAX, Math.min(MAX, angle + vel));
-    if (Math.abs(angle) < 0.03 && Math.abs(vel) < 0.03) {
-      angle = 0;
-      vel = 0;
+    const resting = Math.abs(angle) < 0.02 && Math.abs(vel) < 0.02 && Math.abs(speed) < 0.05 && performance.now() > userUntil;
+    if (resting) {
+      angle = vel = speed = 0;
       raf = 0;
       box.style.setProperty('--swing', '0deg');
       return;
     }
     box.style.setProperty('--swing', `${angle.toFixed(2)}deg`);
     raf = requestAnimationFrame(step);
-  };
-  box.addEventListener(
-    'scroll',
-    () => {
-      const d = box.scrollLeft - last;
-      last = box.scrollLeft;
-      if (performance.now() > userUntil) return;
-      vel += Math.max(-1.6, Math.min(1.6, -d * 0.03));
-      if (!raf) raf = requestAnimationFrame(step);
-    },
-    { passive: true }
-  );
+  }
+  box.addEventListener('scroll', kick, { passive: true });
 }
 
 function saveErrorText(e) {
