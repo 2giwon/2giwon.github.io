@@ -148,6 +148,13 @@ test('9. readFile 은 한글 내용(UTF-8)과 sha 를 돌려준다', async () =>
   assert.equal(fetch.calls[0].url, 'https://api.github.com/repos/2giwon/personal-docs/contents/todo/tasks.json');
 });
 
+test('L3. readFile 은 브라우저 캐시를 그대로 쓰지 않고 GitHub 에 바뀌었는지 묻는다(no-cache, 실시간 갱신 11-26)', async () => {
+  const fetch = fakeFetch(() => res(200, { content: b64('{}'), sha: 's1' }));
+  const gh = createGitHub({ token: 'tk', fetch });
+  await gh.readFile('personal-docs', 'todo/tasks.json');
+  assert.equal(fetch.calls[0].init.cache, 'no-cache');
+});
+
 test('9. readFile 은 파일이 없으면(404) null', async () => {
   const gh = createGitHub({ token: 'tk', fetch: fakeFetch(() => res(404, {})) });
   assert.equal(await gh.readFile('personal-docs', 'todo/tasks.json'), null);

@@ -10,6 +10,7 @@ import { todayView, addTask, completeTask, moveToToday, moveToLater, setStage, n
 import { boardingPasses, PASS_LABEL, flapFrames } from '../airport.mjs';
 import { LAB } from '../catalog.mjs';
 import { nowWorldClock, offWorkClock } from '../clock.mjs';
+import { LIVE_MS, canRefresh, tasksChanged } from '../live.mjs';
 
 const REDMINE = 'https://redmine.wp-dev.xyz/issues/';
 const SWIPE_PX = 90;
@@ -144,6 +145,13 @@ export function passesSection(store, projects, onChange = () => {}) {
   const doneBox = h('div', { class: 'done-box' });
   const toast = h('div', { class: 'undo-toast', role: 'status', hidden: true });
   let data = null;
+  let sha = null; // 지금 그린 할 일 파일의 지문. 실시간 갱신이 바뀌었는지 비교한다
+  let liveError = false; // 상태 줄에 실시간 갱신 실패를 띄웠는지(저장 안내를 지우지 않으려고 따로 둔다)
+  // 저장이나 다시 읽기를 시작할 때마다 1씩 올린다. 다시 읽기 응답이 왔을 때 그 사이 번호가 바뀌었으면
+  // 더 새로운 저장이나 읽기가 있었다는 뜻이라 버린다(늦게 온 예전 응답이 저장한 내용을 덮지 않게, codex P2 11-26)
+  let seq = 0;
+  let saveFailed = false; // 저장 실패 안내가 떠 있다. 다시 읽기가 이 안내를 덮거나 지우지 않는다(codex P2 11-26)
+  let refreshing = false; // 다시 읽기는 한 번에 하나만. 응답이 20초보다 늦어도 다음 읽기가 앞 응답을 계속 버리지 않게(codex P2 11-26)
   let busy = false;
   let toastTimer = null;
   let flipped = null; // 뒷면을 보고 있는 할 일 id
@@ -169,6 +177,8 @@ export function passesSection(store, projects, onChange = () => {}) {
   async function save(change, message, onSaved = () => {}) {
     if (busy) return false;
     busy = true;
+    seq += 1;
+    liveError = false; // 상태 줄은 이제 저장 안내 차지. 다시 읽기가 회복돼도 저장 실패 안내를 지우지 않는다(codex P2 11-26)
     status.className = 'bp-status saving';
     status.textContent = '저장 중';
     for (const el of [passesBox, laterBox].flatMap((b) => [...b.querySelectorAll('button, input, select')])) el.disabled = true;
@@ -176,11 +186,15 @@ export function passesSection(store, projects, onChange = () => {}) {
     try {
       const r = await store.updateTasks(change, message);
       data = r.data;
+      sha = r.sha;
+      liveError = false;
+      saveFailed = false;
       status.className = 'bp-status';
       status.textContent = '';
       onSaved();
       ok = true;
     } catch (e) {
+      saveFailed = true;
       status.className = 'bp-status error';
       status.textContent = `저장하지 못했어요 (${saveErrorText(e)})`;
     } finally {
@@ -426,6 +440,7 @@ export function passesSection(store, projects, onChange = () => {}) {
         return;
       }
       data = r.data;
+      sha = r.sha;
       draw();
       setTimeout(flipPasses, 900); // 처음 열 때 한 번
       if (r.state === 'missing') passesBox.prepend(empty('할 일 파일이 아직 없어요. 첫 탑승권을 발권하면 만들어져요'));
@@ -436,6 +451,78 @@ export function passesSection(store, projects, onChange = () => {}) {
       onChange({ loaded: true, passes: [] });
     }
   }
+
+  /**
+   * 실시간 갱신(11-26 사용자 요청). /todo 나 다른 기기에서 할 일을 바꾸면 새로 고침 없이 레일에 나타난다.
+   * 20초마다, 그리고 화면으로 돌아오는 순간 할 일 파일을 다시 읽고 지문이 바뀌었을 때만 다시 그린다(live.mjs).
+   * 저장 중, 발권 칸에 쓰는 중, 탑승권을 미는 중, 뒷면 칸을 만지는 중에는 건드리지 않는다.
+   * 실패하면 화면은 그대로 두고 상태 줄에 알리며, 다음 확인이 성공하면 안내를 지운다.
+   */
+  async function refresh() {
+    if (!data || !passesBox.isConnected) return; // 첫 읽기 전이거나 실패했다(실패 칸에 다시 시도 버튼이 있다), 또는 화면에 없다
+    // 지금 사용자가 무언가를 하는 중인지. 요청 전과 응답 뒤에 두 번 본다(기다리는 사이 밀기를 시작할 수 있다, codex P2 11-26)
+    const calm = () => {
+      const active = document.activeElement;
+      // 입력 칸을 만지는 중이거나, 키보드로 레일의 버튼에 초점을 둔 중이면(다시 그리면 초점이 사라진다, codex P2 11-26)
+      const editing = !!active?.matches?.('input, select, textarea, :focus-visible') && (passesBox.contains(active) || laterBox.contains(active));
+      const dragging = !!passesBox.querySelector('.dragging, .fly-right, .fly-left');
+      return canRefresh({ hidden: document.hidden, busy, adding, dragging, editing });
+    };
+    if (refreshing || !calm()) return;
+    const mine = ++seq;
+    let r;
+    refreshing = true;
+    try {
+      r = await store.tasks();
+    } catch (e) {
+      if (mine !== seq || busy || saveFailed) return;
+      liveError = true;
+      status.className = 'bp-status error';
+      status.textContent = `새 할 일을 확인하지 못했어요 (${errorText(e)}). 잠시 뒤 다시 확인해요`;
+      return;
+    } finally {
+      refreshing = false;
+    }
+    // 읽는 사이 저장이나 더 새로운 읽기가 있었거나, 화면을 떠났거나, 손을 대기 시작했으면 이 응답은 버린다
+    if (mine !== seq || !passesBox.isConnected || !calm()) return;
+    if (r.state === 'invalid') {
+      if (saveFailed) return;
+      liveError = true;
+      status.className = 'bp-status error';
+      status.textContent = `새 할 일 파일 형식이 맞지 않아요 (${r.error}). 지금 화면은 마지막으로 읽은 내용이에요`;
+      return;
+    }
+    if (liveError) {
+      liveError = false;
+      status.className = 'bp-status';
+      status.textContent = '';
+    }
+    if (!tasksChanged(sha, r.sha)) return;
+    data = r.data;
+    sha = r.sha;
+    const left = passesBox.scrollLeft; // 넘겨 보던 자리를 지킨다
+    draw();
+    passesBox.scrollLeft = left;
+  }
+  // 화면에 한 번 붙은 뒤 떨어지면(다른 화면으로 가면) 20초 반복과 탭 전환 알림을 함께 치운다.
+  // 첫 읽기가 실패했어도 치운다(data 와 무관하게, codex P2 11-26)
+  let attached = false;
+  const gone = () => {
+    if (passesBox.isConnected) attached = true;
+    if (!attached || passesBox.isConnected) return false;
+    clearInterval(liveLoop);
+    document.removeEventListener('visibilitychange', onVisible);
+    return true;
+  };
+  const liveLoop = setInterval(() => {
+    if (!gone()) void refresh();
+  }, LIVE_MS);
+  const onVisible = () => {
+    if (!gone() && !document.hidden) void refresh();
+  };
+  document.addEventListener('visibilitychange', onVisible);
+  // 상태판은 이 칸을 만든 바로 뒤 화면에 붙인다. 그 직후 붙었는지 기록해 둬야 20초 안에 떠나도 치운다(codex P2 11-26)
+  setTimeout(gone, 0);
 
   void load();
   const rail = h(

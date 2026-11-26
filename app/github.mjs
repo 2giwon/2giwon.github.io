@@ -57,11 +57,12 @@ function kindFor(res) {
 }
 
 export function createGitHub({ token, fetch }) {
-  async function request(path, accept = 'application/vnd.github+json', { method = 'GET', body } = {}) {
+  async function request(path, accept = 'application/vnd.github+json', { method = 'GET', body, cache } = {}) {
     let res;
     try {
       res = await fetch(API + path, {
         method,
+        ...(cache ? { cache } : {}),
         headers: {
           Accept: accept,
           Authorization: `Bearer ${token}`,
@@ -134,7 +135,8 @@ export function createGitHub({ token, fetch }) {
     /** 파일 글과 sha. 파일이 없으면 null. @returns {Promise<{text:string, sha:string}|null>} */
     async readFile(repo, path) {
       try {
-        const res = await request(`/repos/${OWNER}/${repo}/contents/${path}`);
+        // no-cache: 브라우저가 1분 동안 예전 응답을 그대로 쓰지 않고 GitHub 에 바뀌었는지 묻는다(실시간 갱신 11-26)
+        const res = await request(`/repos/${OWNER}/${repo}/contents/${path}`, undefined, { cache: 'no-cache' });
         const body = await res.json();
         return { text: fromBase64(body.content ?? ''), sha: body.sha };
       } catch (e) {

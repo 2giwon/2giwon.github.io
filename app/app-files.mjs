@@ -17,6 +17,7 @@ export const APP_FILES = [
   'app/handover.mjs',
   'app/icons.mjs',
   'app/links.mjs',
+  'app/live.mjs',
   'app/main.mjs',
   'app/media.mjs',
   'app/route.mjs',
