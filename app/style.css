@@ -141,8 +141,62 @@ button.primary {
 .banner.ok { background: var(--ok-bg); color: var(--ok-ink); }
 .banner.risk { background: var(--risk-bg); color: var(--risk-ink); }
 
+/* 상태판 테마 배너: Claude 주황에서 보라로 은은하게 번지는 그라데이션. 상태판 카드의 최소 높이(160px)를 쓰지 않는다 */
+.theme-banner {
+  --tb-orange: #d97757; --tb-violet: #8b5cf6;
+  position: relative; display: flex; align-items: center; gap: 14px; padding: 14px 14px 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--tb-orange) 30%, var(--line)); border-radius: var(--radius);
+  background:
+    radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--tb-orange) 18%, transparent), transparent 60%),
+    radial-gradient(120% 140% at 100% 100%, color-mix(in srgb, var(--tb-violet) 16%, transparent), transparent 60%),
+    var(--surface);
+  color: var(--ink); text-decoration: none; overflow: hidden;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.theme-banner:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--tb-orange) 55%, var(--line)); box-shadow: 0 8px 24px -12px color-mix(in srgb, var(--tb-violet) 60%, transparent); }
+.theme-banner:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.theme-banner-icon {
+  flex: none; align-self: flex-start; display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border-radius: 50%; color: #fff;
+  background: linear-gradient(135deg, var(--tb-orange), var(--tb-violet));
+  box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--tb-orange) 70%, transparent);
+}
+.theme-banner-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.theme-banner-title { display: inline-flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 700; }
+.theme-banner-arrow { font-size: 20px; line-height: 1; color: var(--tb-orange); transition: transform 0.18s ease; }
+.theme-banner:hover .theme-banner-arrow { transform: translateX(3px); }
+.theme-banner-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+/* 지금 테마 줄은 가장 긴 안내 문구(폰에서 이름표 한 줄 + 두 줄)만큼 자리를 먼저 잡아, 로딩에서 바뀔 때 아래가 밀리지 않는다(리뷰 11-26) */
+.theme-banner-now { display: flex; flex-wrap: wrap; align-content: flex-start; align-items: center; gap: 6px; margin-top: 4px; min-height: 66px; font-size: 12px; color: var(--muted); }
+@media (min-width: 560px) { .theme-banner-now { min-height: 24px; } }
+.theme-banner-pill {
+  display: inline-flex; align-items: center; min-height: 22px; padding: 2px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; color: var(--ink);
+  background: color-mix(in srgb, var(--tb-violet) 14%, var(--surface)); border: 1px solid color-mix(in srgb, var(--tb-violet) 35%, var(--line));
+}
+.theme-banner-pill.quiet, .theme-banner-pill.fail { border-radius: 8px; word-break: keep-all; line-height: 1.4; }
+.theme-banner-pill.quiet { font-weight: 400; color: var(--muted); background: var(--chip); border-color: var(--line); }
+.theme-banner-pill.fail { font-weight: 400; color: var(--risk-ink); background: var(--risk-bg); border-color: transparent; }
+.theme-banner-pill.loading, .theme-banner-thumb.loading {
+  background: linear-gradient(90deg, var(--sk-a) 25%, var(--sk-b) 50%, var(--sk-a) 75%);
+  background-size: 200% 100%; animation: shimmer 1.2s infinite linear; border-color: transparent;
+}
+.theme-banner-pill.loading { width: 84px; }
+.theme-banner-thumb {
+  flex: none; position: relative; width: 112px; aspect-ratio: 16 / 10; border-radius: 8px; overflow: hidden;
+  display: inline-flex; align-items: center; justify-content: center; color: var(--muted);
+  background: var(--chip); border: 1px solid var(--line);
+}
+.theme-banner-thumb.has-img { border-color: color-mix(in srgb, var(--tb-violet) 35%, var(--line)); box-shadow: 0 6px 16px -8px rgba(0, 0, 0, 0.45); }
+.theme-banner-thumb.failed { background: var(--risk-bg); color: var(--risk-ink); border-color: transparent; font-size: 11px; }
+.theme-banner-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+@media (min-width: 760px) { .theme-banner-thumb { width: 160px; } }
+@media (prefers-reduced-motion: reduce) {
+  .theme-banner, .theme-banner-arrow { transition: none; }
+  .theme-banner:hover { transform: none; }
+  .theme-banner-pill.loading, .theme-banner-thumb.loading { animation: none; }
+}
 /* 테마 갤러리 (11-26). 폰 1열, 넓은 화면 2열. 미리보기는 16:10 자리를 먼저 잡아 영상이 와도 밀리지 않는다 */
-.themes-link { display: block; text-decoration: none; color: var(--ink); font-weight: 600; }
 .themes-page h1 { margin: 4px 0 6px; font-size: 22px; }
 .theme-status { min-height: 24px; margin: 8px 0 16px; }
 .theme-status .banner { margin-top: 8px; }

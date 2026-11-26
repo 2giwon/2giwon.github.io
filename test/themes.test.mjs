@@ -9,6 +9,8 @@ import {
   parseThemeRequest,
   makeThemeRequest,
   themeProgress,
+  themeBannerState,
+  loadThemeBanner,
   THEME_REQUEST_PATH,
   THEME_STATUS_PATH,
 } from '../app/themes.mjs';
@@ -153,6 +155,77 @@ test('W5. 요청 파일을 읽는다. 모양이 틀리면 null', () => {
   });
   assert.equal(parseThemeRequest('{"theme":"../x","requestedAt":"2026-11-26T10:00:00.000Z"}'), null);
   assert.equal(parseThemeRequest('x'), null);
+});
+
+// ─── B1~B5: 상태판 테마 배너 ──────────────────────────────────────────────────
+
+const okSnap = (current) => ({ request: null, status: { state: 'ok', data: { current, installed: [], last: null } } });
+
+test('B1. 켜진 테마가 있으면 이름과 보기 좋은 제목', () => {
+  assert.deepEqual(themeBannerState(okSnap('good-vibes')), { kind: 'current', theme: 'good-vibes', title: 'Good Vibes' });
+});
+
+test('B2. 결과 파일이 없으면 연결 안 됨', () => {
+  assert.deepEqual(themeBannerState({ request: null, status: { state: 'missing' } }), { kind: 'missing' });
+});
+
+test('B3. 결과 파일이 깨졌으면 못 불러옴', () => {
+  assert.deepEqual(themeBannerState({ request: null, status: { state: 'invalid', error: 'x' } }), { kind: 'invalid' });
+});
+
+test('B4. 켜진 테마가 없거나 이상한 이름이면 켜진 테마 없음', () => {
+  assert.deepEqual(themeBannerState(okSnap(null)), { kind: 'none' });
+  assert.deepEqual(themeBannerState(okSnap('../x')), { kind: 'none' });
+});
+
+const later = (ms, fn) => new Promise((resolve, reject) => setTimeout(() => Promise.resolve().then(fn).then(resolve, reject), ms));
+
+test('B5. 느린 응답: 로딩을 먼저 알리고, 이름 다음에 썸네일을 채운다', async () => {
+  const seen = [];
+  const store = {
+    themeSnapshot: () => later(20, () => okSnap('good-vibes')),
+    themePreview: (name, ext) => later(20, () => ({ name, ext })),
+  };
+  const p = loadThemeBanner(store, (s) => seen.push(s));
+  assert.deepEqual(seen, [{ kind: 'loading' }]);
+  await p;
+  assert.deepEqual(seen.slice(1), [
+    { kind: 'current', theme: 'good-vibes', title: 'Good Vibes', thumb: 'loading' },
+    { kind: 'current', theme: 'good-vibes', title: 'Good Vibes', thumb: 'ok', bytes: { name: 'good-vibes', ext: 'png' } },
+  ]);
+});
+
+test('B5. 상태 요청이 실패하면 error 로 끝나고 썸네일은 요청하지 않는다', async () => {
+  const seen = [];
+  let previewCalls = 0;
+  const store = {
+    themeSnapshot: () => later(10, () => Promise.reject(Object.assign(new Error('x'), { kind: 'network' }))),
+    themePreview: () => (previewCalls += 1),
+  };
+  await loadThemeBanner(store, (s) => seen.push(s));
+  assert.equal(seen.length, 2);
+  assert.equal(seen[1].kind, 'error');
+  assert.equal(seen[1].error.kind, 'network');
+  assert.equal(previewCalls, 0);
+});
+
+test('B5. 썸네일 요청이 실패해도 이름은 남고 thumb 만 failed', async () => {
+  const seen = [];
+  const store = {
+    themeSnapshot: () => later(5, () => okSnap('sky-clock')),
+    themePreview: () => later(5, () => Promise.reject(new Error('404'))),
+  };
+  await loadThemeBanner(store, (s) => seen.push(s));
+  assert.deepEqual(seen.at(-1), { kind: 'current', theme: 'sky-clock', title: 'Sky Clock', thumb: 'failed' });
+});
+
+test('B5. 결과 파일이 없으면 missing 으로 끝나고 썸네일은 요청하지 않는다', async () => {
+  const seen = [];
+  let previewCalls = 0;
+  const store = { themeSnapshot: () => later(5, () => ({ request: null, status: { state: 'missing' } })), themePreview: () => (previewCalls += 1) };
+  await loadThemeBanner(store, (s) => seen.push(s));
+  assert.deepEqual(seen, [{ kind: 'loading' }, { kind: 'missing' }]);
+  assert.equal(previewCalls, 0);
 });
 
 test('경로는 personal-docs 의 claude-theme 폴더', () => {

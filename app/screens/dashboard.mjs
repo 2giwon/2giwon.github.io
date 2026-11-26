@@ -8,6 +8,8 @@ import { videoSection } from './video.mjs';
 import { recentTimeline } from '../timeline.mjs';
 import { timelineChart } from '../draw.mjs';
 import { today } from '../store.mjs';
+import { iconSvg } from '../icons.mjs';
+import { loadThemeBanner } from '../themes.mjs';
 
 const TIMELINE_DAYS = 14;
 const LATEST_COUNT = 10;
@@ -117,13 +119,74 @@ function timelineSection(catalog) {
   );
 }
 
-/** Claude 테마 갤러리로 가는 길(11-26). 서버 값을 그리지 않는 고정 링크라 로딩 자리가 필요 없다. */
-function themesLink() {
+/**
+ * 테마 갤러리로 가는 배너(11-26). 글과 링크는 바로 보이고, 지금 테마 이름과 썸네일만 서버에서 받아 채운다.
+ * 썸네일 blob 주소는 그림을 그린 뒤(또는 실패하면) 바로 정리해 상태판을 여러 번 열어도 쌓이지 않는다.
+ */
+function themesLink(store) {
+  const pill = h('span', { class: 'theme-banner-pill' });
+  const thumb = h('span', { class: 'theme-banner-thumb', html: iconSvg('palette') });
+  const nowLine = h('span', { class: 'theme-banner-now' }, h('span', { class: 'theme-banner-now-label' }, '지금 테마'), pill);
+
+  const PILL_TEXT = {
+    missing: '맥 앱이 아직 연결되지 않았어요',
+    invalid: '맥 상태를 못 불러왔어요',
+    error: '맥 상태를 못 불러왔어요',
+    none: '켜진 테마 없음',
+  };
+  loadThemeBanner(store, (s) => {
+    if (s.kind === 'loading') {
+      pill.className = 'theme-banner-pill loading';
+      pill.setAttribute('aria-label', '불러오는 중');
+      pill.replaceChildren();
+      return;
+    }
+    pill.removeAttribute('aria-label');
+    if (s.kind !== 'current') {
+      pill.className = `theme-banner-pill ${s.kind === 'invalid' || s.kind === 'error' ? 'fail' : 'quiet'}`;
+      pill.replaceChildren(PILL_TEXT[s.kind]);
+      return;
+    }
+    pill.className = 'theme-banner-pill';
+    pill.replaceChildren(s.title);
+    if (s.thumb === 'loading') thumb.classList.add('loading');
+    else thumb.classList.remove('loading');
+    // 썸네일 실패는 "미리보기 없음"으로 알린다. 아이콘만 남기면 아직 안 받은 것과 구분되지 않는다(리뷰 11-26)
+    const thumbFailed = () => {
+      thumb.className = 'theme-banner-thumb failed';
+      thumb.replaceChildren(h('span', null, '미리보기 없음'));
+    };
+    if (s.thumb === 'failed') thumbFailed();
+    if (s.thumb === 'ok') {
+      const url = URL.createObjectURL(new Blob([s.bytes], { type: 'image/png' }));
+      const done = () => URL.revokeObjectURL(url);
+      const broken = () => {
+        done();
+        thumbFailed();
+      };
+      const img = h('img', { src: url, alt: `${s.title} 미리보기`, onload: done, onerror: broken });
+      thumb.replaceChildren(img);
+      thumb.classList.add('has-img');
+    }
+  });
+
   return h(
     'section',
     { class: 'group' },
     h('h2', null, 'Claude 테마'),
-    h('a', { class: 'card themes-link', href: '#/themes' }, '테마 갤러리 열기', h('span', { class: 'muted' }, ' 미리보기를 보고 맥의 Claude 테마를 바꿔요'))
+    h(
+      'a',
+      { class: 'theme-banner', href: '#/themes' },
+      h('span', { class: 'theme-banner-icon', html: iconSvg('palette') }),
+      h(
+        'span',
+        { class: 'theme-banner-text' },
+        h('span', { class: 'theme-banner-title' }, '테마 갤러리 열기', h('span', { class: 'theme-banner-arrow', 'aria-hidden': 'true' }, '›')),
+        h('span', { class: 'theme-banner-desc' }, '미리보기를 보고 맥의 Claude 테마를 바꿔요'),
+        nowLine
+      ),
+      thumb
+    )
   );
 }
 
@@ -145,7 +208,7 @@ export function dashboardScreen(store, catalog) {
     { class: 'dashboard' },
     todaySection(store),
     videoSection(store, catalog),
-    themesLink(),
+    themesLink(store),
     catalog.groups.map((g) => groupSection(store, g)),
     timelineSection(catalog)
   );

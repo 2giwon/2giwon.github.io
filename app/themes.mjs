@@ -93,6 +93,43 @@ export function makeThemeRequest(name, knownThemes, now = new Date()) {
 }
 
 /**
+ * 상태판 테마 배너에 쓸 맥 상태(11-26).
+ * current: 켜진 테마가 있다 / missing: 결과 파일이 없다(맥 앱 연결 전) / invalid: 결과 파일이 깨졌다 / none: 켜진 테마가 없다
+ */
+export function themeBannerState(snapshot) {
+  const st = snapshot?.status;
+  if (st?.state === 'missing') return { kind: 'missing' };
+  if (st?.state !== 'ok') return { kind: 'invalid' };
+  const name = st.data?.current;
+  return isThemeName(name) ? { kind: 'current', theme: name, title: themeTitle(name) } : { kind: 'none' };
+}
+
+/**
+ * 배너 값을 받으며 단계마다 emit 으로 알린다. 로딩 → 맥 상태 → (켜진 테마가 있으면) 썸네일 로딩 → 썸네일 결과.
+ * 실패해도 throw 하지 않는다. 상태 실패는 kind error, 썸네일 실패는 thumb failed.
+ */
+export async function loadThemeBanner(store, emit) {
+  emit({ kind: 'loading' });
+  let state;
+  try {
+    state = themeBannerState(await store.themeSnapshot());
+  } catch (error) {
+    emit({ kind: 'error', error });
+    return;
+  }
+  if (state.kind !== 'current') {
+    emit(state);
+    return;
+  }
+  emit({ ...state, thumb: 'loading' });
+  try {
+    emit({ ...state, thumb: 'ok', bytes: await store.themePreview(state.theme, 'png') });
+  } catch {
+    emit({ ...state, thumb: 'failed' });
+  }
+}
+
+/**
  * 요청과 결과를 합친 진행 상태.
  * - none: 요청이 없다
  * - waiting: 요청 뒤의 결과가 아직 없다(맥 앱이 아직 가져가지 않음). minutes = 요청 뒤 지난 분

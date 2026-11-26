@@ -15,6 +15,9 @@ export const ICONS = {
   moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
   // 토큰 지우기: 열쇠와 X
   'key-off': '<circle cx="7.5" cy="15.5" r="3.5"/><path d="M10 13l6-6M14 9l2 2"/><path d="M17 15l4 4M21 15l-4 4"/>',
+  // Claude 테마: 물감 팔레트(상태판 테마 배너, 11-26)
+  palette:
+    '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.9 1.8-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4c0-4.4-4-8-9-8z"/><circle cx="7.5" cy="11" r="1" fill="currentColor"/><circle cx="10" cy="7" r="1" fill="currentColor"/><circle cx="14.5" cy="7" r="1" fill="currentColor"/><circle cx="17" cy="10.5" r="1" fill="currentColor"/>',
 };
 
 /** 아이콘 SVG 글자. 모르는 이름이면 빈 글자(화면이 깨지지 않게). */
