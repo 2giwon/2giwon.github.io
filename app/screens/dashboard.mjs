@@ -389,9 +389,9 @@ export function dashboardScreen(store, catalog) {
   return h(
     'div',
     { class: 'airport' },
-    h('div', { class: 'ap-main' }, rail, tower.section, lounge),
+    // 세션 카드(방 장면)는 왼쪽 큰 기둥 맨 위, 오늘 탑승할 주문 위(11-27 사용자 요청: 영역을 더 크게)
+    h('div', { class: 'ap-main' }, sessions, rail, tower.section, lounge),
     // 귀가편 6211 은 탑승권 레일 머리의 시계 옆으로 옮겼다(#163, passes.mjs)
-    // 세션 카드는 오른쪽 기둥 맨 위(오늘 도착 위, 11-27 사용자 요청)
-    h('aside', { class: 'ap-aside' }, sessions, side, h('div', { class: 'ap-bottom' }, arrivalsSection(catalog), flightLogSection(catalog)))
+    h('aside', { class: 'ap-aside' }, side, h('div', { class: 'ap-bottom' }, arrivalsSection(catalog), flightLogSection(catalog)))
   );
 }

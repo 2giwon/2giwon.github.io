@@ -546,7 +546,7 @@ button.primary {
 .board-title small { font-size: 12px; font-weight: 400; color: var(--muted); }
 
 /* 칸 배치. PC: 왼쪽(레일, 관제탑, 라운지) + 오른쪽(오늘 도착과 나중에, 도착 안내와 운항 기록) */
-.airport { display: grid; gap: 18px; margin-top: 16px; grid-template-columns: minmax(0, 1fr); grid-template-areas: 'rail' 'sess' 'top' 'tower' 'lounge' 'bottom'; }
+.airport { display: grid; gap: 18px; margin-top: 16px; grid-template-columns: minmax(0, 1fr); grid-template-areas: 'sess' 'rail' 'top' 'tower' 'lounge' 'bottom'; }
 .ap-main, .ap-aside { display: contents; }
 .ap-rail { grid-area: rail; } .ap-top { grid-area: top; } .ap-sess { grid-area: sess; } .ap-tower { grid-area: tower; } .ap-lounge { grid-area: lounge; } .ap-bottom { grid-area: bottom; }
 @media (min-width: 960px) {
@@ -928,6 +928,13 @@ a.sess-row:hover, a.sess-row:focus-visible { background: var(--board-3); }
 .sess-room.loading .sess-room-wait { width: 100%; height: 100%; background: linear-gradient(90deg, var(--board-3) 25%, #34373c 50%, var(--board-3) 75%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .sess-room.loading .sess-room-wait { animation: none; } }
 .sess-room-note { margin: 0 0 8px; font-size: 11.5px; color: var(--board-muted); }
+/* 넓은 화면: 왼쪽 큰 기둥 맨 위에서 방(왼쪽, 크게)과 목록(오른쪽) 두 칸 */
+@media (min-width: 960px) {
+  .ap-main .sess { display: grid; grid-template-columns: minmax(0, 3fr) minmax(240px, 2fr); column-gap: 18px; align-items: start; }
+  .ap-main .sess > h3 { grid-column: 1 / -1; }
+  .ap-main .sess > .sess-room, .ap-main .sess > .sess-room-note { grid-column: 1; }
+  .ap-main .sess > .sess-body { grid-column: 2; grid-row: 2 / span 2; max-height: 400px; overflow-y: auto; }
+}
 .sess-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .sess-text b { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sess-text > span { font-size: 11.5px; color: var(--board-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
