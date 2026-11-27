@@ -79,6 +79,41 @@ export function matchProject(taskProject, projects) {
   );
 }
 
+// 폰 탑승권 더미 넘기기(11-27 사용자: "다음 티켓을 보기가 힘들어", "옆으로 밀면 다음 티켓, 밑에서 위로 올리면 완료").
+// 예전에는 옆으로 밀면 바로 탑승 완료(오른쪽)나 나중에(왼쪽)로 처리돼서, 다음 티켓을 보려면 앞 티켓을 처리해야 했다.
+// 나중에는 탑승권의 버튼으로만 한다(사용자 결정)
+
+/** 손가락을 이만큼(px) 넘게 밀어야 넘기기나 완료로 친다 */
+export const SWIPE_PX = 90;
+
+/** 탑승권 목록 → 맨 앞 티켓(frontId)이 앞에 오게 돌린 목록. 나머지 순서는 그대로, 없는 번호면 처음부터 */
+export function stackOrder(passes, frontId) {
+  const i = passes.findIndex((p) => p.task.id === frontId);
+  return i > 0 ? [...passes.slice(i), ...passes.slice(0, i)] : [...passes];
+}
+
+/** 맨 앞 티켓에서 dir(1 다음, -1 이전)만큼 넘긴 티켓 번호. 끝에서는 처음으로 돌아온다. 없는 번호면 처음 티켓에서 센다 */
+export function stepFront(passes, frontId, dir) {
+  if (!passes.length) return null;
+  const i = Math.max(0, passes.findIndex((p) => p.task.id === frontId));
+  const n = passes.length;
+  return passes[(((i + dir) % n) + n) % n].task.id;
+}
+
+/**
+ * 손가락이 움직인 거리 → 할 일. 옆으로 더 많이 밀었으면 넘기기(왼쪽 next, 오른쪽 prev),
+ * 위로 더 많이 올렸고 탑승권 아래쪽(점선 아래 바코드 부분, lower)을 잡았으면 완료(done). 그 밖은 null.
+ * 제목 쪽을 잡고 위아래로 밀면 화면을 스크롤해야 해서 완료로 치지 않는다(사용자 결정 11-27)
+ */
+export function swipeIntent({ dx, dy, lower }) {
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    if (dx < -SWIPE_PX) return 'next';
+    if (dx > SWIPE_PX) return 'prev';
+    return null;
+  }
+  return lower && dy < -SWIPE_PX ? 'done' : null;
+}
+
 /**
  * 오늘 할 일(todayView().today) → 탑승권 목록.
  * 머리띠: 맨 앞 한 장은 탑승 중, 이월된 것은 지연, 나머지는 대기. 단계 긴급은 도장(urgent). 편명은 앞 두 글자별로 1부터.

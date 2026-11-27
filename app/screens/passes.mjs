@@ -7,15 +7,15 @@
 import { h, skeleton, failure, empty, errorText } from '../dom.mjs';
 import { today } from '../store.mjs';
 import { todayView, addTask, completeTask, moveToToday, moveToLater, setStage, needsTicket, restoreTask, STAGES, STAGE_LABEL } from '../todo.mjs';
-import { boardingPasses, PASS_LABEL, flapFrames } from '../airport.mjs';
+import { boardingPasses, PASS_LABEL, flapFrames, stackOrder, stepFront, swipeIntent } from '../airport.mjs';
 import { LAB } from '../catalog.mjs';
 import { nowWorldClock, offWorkClock } from '../clock.mjs';
 import { LIVE_MS, canRefresh, tasksChanged } from '../live.mjs';
 import { commuteBadge } from './commute.mjs';
 
 const REDMINE = 'https://redmine.wp-dev.xyz/issues/';
-const SWIPE_PX = 90;
 const UNDO_MS = 5000;
+const FLY_MS = 180; // 넘기기: 앞 티켓이 옆으로 날아간 뒤 다음 티켓을 앞에 그린다
 
 /**
  * 레일을 옆으로 넘기면 집게에 매달린 탑승권이 실제 종이처럼 흔들린다(11-26 사용자 요청).
@@ -158,6 +158,9 @@ export function passesSection(store, projects, onChange = () => {}) {
   let flipped = null; // 뒷면을 보고 있는 할 일 id
   let adding = false;
   let queuedUndo = null; // 다른 저장 중에 누른 되돌리기. 저장이 끝나면 이어서 한다(codex P2 11-26)
+  // 폰 더미 맨 앞에 보이는 티켓 번호(11-27). 옆으로 밀면 바뀐다. null 이면 목록 첫 티켓
+  let frontId = null;
+  let shownPasses = []; // 지금 그린 탑승권(원래 순서). 넘기기가 다음, 이전을 셀 때 쓴다
   // 탑승권 머리띠 편명 글자판. 다시 그릴 때마다 새로 모으고, 몇 초마다 한 장씩 차례로 촤르르 돈다(11-26 사용자 요청)
   let passBoards = [];
   const passBoard = (code) => {
@@ -170,7 +173,14 @@ export function passesSection(store, projects, onChange = () => {}) {
     if (data && !passesBox.isConnected) return clearInterval(flipLoop); // 다른 화면으로 가면 멈춘다
     flipPasses();
   }, FLAP_EVERY_MS);
-  const stacked = () => typeof matchMedia === 'function' && matchMedia('(max-width: 759px)').matches;
+  const phoneQuery = typeof matchMedia === 'function' ? matchMedia('(max-width: 759px)') : null;
+  const stacked = () => !!phoneQuery?.matches;
+  // 폰 폭과 넓은 화면을 오가면(폰 가로 돌리기 등) 더미 순서와 맨 앞 티켓(frontId)이 어긋나지 않게 다시 그린다(codex P2 11-27).
+  // 다른 화면으로 가면 아래 gone() 이 실시간 갱신과 함께 듣기를 그만둔다(codex P2 11-27: 화면을 오갈 때마다 쌓였다)
+  const onLayout = () => {
+    if (data && passesBox.isConnected) draw();
+  };
+  phoneQuery?.addEventListener?.('change', onLayout);
   // 발권 칸에 쓰던 값. 다시 그려도(저장 실패 포함) 남아 있고, 발권이 성공했을 때만 비운다(codex P2 11-11)
   const draft = { title: '', stage: 'normal', when: 'today' };
 
@@ -234,56 +244,93 @@ export function passesSection(store, projects, onChange = () => {}) {
     toastTimer = setTimeout(() => (toast.hidden = true), UNDO_MS);
   }
 
+  /**
+   * 폰 더미 맨 앞 티켓을 처리하면 그다음 티켓이 앞에 오게 한다(처음 티켓으로 돌아가지 않게). 바꾸기 전 값을 돌려준다.
+   * 저장 뒤 다시 그릴 때 바로 다음 티켓이 보이도록 저장 전에 바꾸고, 저장이 실패하면 restorePlace 로 되돌린다
+   */
+  function keepPlace(task) {
+    const before = frontId;
+    if (busy) return before; // 저장 중이면 save 가 아무것도 하지 않으므로 바꾸지 않는다
+    if (frontId === task.id || (frontId === null && shownPasses[0]?.task.id === task.id)) {
+      const next = stepFront(shownPasses, task.id, 1);
+      frontId = next === task.id ? null : next;
+    }
+    return before;
+  }
+  /** 저장이 실패하면 처리하려던 티켓이 다시 맨 앞에 오게 되돌린다(11-27 확인 페이지에서 실패를 일으켜 잡음) */
+  function restorePlace(before) {
+    if (frontId === before) return;
+    frontId = before;
+    draw();
+  }
+
   function complete(task) {
+    const place = keepPlace(task);
     const prev = { status: task.status, doOn: task.doOn, doneOn: task.doneOn ?? null };
     void save((d) => completeTask(d, task.id, today()), `할 일 완료: ${task.title}`).then((ok) => {
       if (ok) showUndo(`탑승 완료: ${task.title}`, () => void save((d) => restoreTask(d, task.id, prev), `할 일 되돌리기: ${task.title}`));
+      else restorePlace(place);
     });
   }
 
   function later(task) {
+    const place = keepPlace(task);
     const prev = { status: task.status, doOn: task.doOn, doneOn: task.doneOn ?? null };
     void save((d) => moveToLater(d, task.id), `할 일 나중에: ${task.title}`).then((ok) => {
       if (ok) showUndo(`나중에 탑승: ${task.title}`, () => void save((d) => restoreTask(d, task.id, prev), `할 일 되돌리기: ${task.title}`));
+      else restorePlace(place);
     });
   }
 
   /**
-   * 폰 손가락으로 밀기. 마우스는 버튼을 쓴다(실수로 끌리지 않게).
-   * 탑승권이 겹쳐 쌓이는 폰 배치에서만 민다. 넓은 화면의 가로 레일에서는 손가락이 레일을 옆으로 넘겨야 한다(codex P2 11-26)
+   * 폰 손가락으로 밀기(11-27 바꿈). 옆으로 밀면 다음(왼쪽), 이전(오른쪽) 티켓으로 넘기고 처리하지 않는다.
+   * 탑승권 아래쪽(점선 아래 바코드와 버튼 줄)을 잡고 위로 올리면 탑승 완료. 나중에는 버튼으로만.
+   * 제목 쪽을 잡고 위아래로 밀면 화면이 스크롤된다(그 부분은 CSS touch-action: pan-y 라 브라우저가 스크롤하고 pointercancel 을 보낸다).
+   * 예전에는 옆으로 밀면 바로 완료(오른쪽)나 나중에(왼쪽)라서, 다음 티켓을 보려면 앞 티켓을 처리해야 했다(사용자 지적).
+   * 마우스는 버튼을 쓴다(실수로 끌리지 않게). 탑승권이 겹쳐 쌓이는 폰 배치에서만 민다(codex P2 11-26)
    */
   function swipeable(el, task) {
     let x0 = null;
+    let y0 = 0;
     let dx = 0;
+    let dy = 0;
+    let lower = false;
     el.addEventListener('pointerdown', (ev) => {
       if (ev.pointerType !== 'touch' || busy || !stacked() || ev.target.closest('button, select, input, a')) return;
       x0 = ev.clientX;
+      y0 = ev.clientY;
       dx = 0;
+      dy = 0;
+      lower = !!ev.target.closest('.bp-perf, .bp-code, .bp-no, .bp-actions');
       el.classList.add('dragging');
     });
     el.addEventListener('pointermove', (ev) => {
       if (x0 === null) return;
       dx = ev.clientX - x0;
-      el.style.transform = `translateX(${dx}px) rotate(${dx / 24}deg)`;
-      el.dataset.hint = dx > SWIPE_PX ? 'done' : dx < -SWIPE_PX ? 'later' : '';
+      dy = ev.clientY - y0;
+      const sideways = Math.abs(dx) >= Math.abs(dy);
+      el.style.transform = sideways ? `translateX(${dx}px) rotate(${dx / 24}deg)` : lower ? `translateY(${Math.min(0, dy)}px)` : '';
+      el.dataset.hint = swipeIntent({ dx, dy, lower }) === 'done' ? 'done' : '';
     });
     const end = () => {
       if (x0 === null) return;
       x0 = null;
       el.classList.remove('dragging');
-      if (dx > SWIPE_PX) {
-        el.classList.add('fly-right');
+      const intent = swipeIntent({ dx, dy, lower });
+      if (intent === 'next' || intent === 'prev') {
+        el.classList.add(intent === 'next' ? 'fly-left' : 'fly-right');
+        frontId = stepFront(shownPasses, frontId ?? task.id, intent === 'next' ? 1 : -1);
+        setTimeout(draw, FLY_MS);
+      } else if (intent === 'done') {
+        el.classList.add('fly-up');
         complete(task);
-      } else if (dx < -SWIPE_PX) {
-        el.classList.add('fly-left');
-        later(task);
       } else {
         el.style.transform = '';
         el.dataset.hint = '';
       }
-      if (Math.abs(dx) > 8) el.dataset.moved = '1'; // 민 뒤에 따라오는 click 은 뒤집기로 치지 않는다
+      if (Math.abs(dx) > 8 || Math.abs(dy) > 8) el.dataset.moved = '1'; // 민 뒤에 따라오는 click 은 뒤집기로 치지 않는다
     };
-    // 브라우저나 기기가 손동작을 끊으면(pointercancel) 저장하지 않고 제자리로 돌린다(codex P2 11-26)
+    // 브라우저나 기기가 손동작을 끊으면(pointercancel, 화면 스크롤 포함) 저장하지 않고 제자리로 돌린다(codex P2 11-26)
     const cancel = () => {
       if (x0 === null) return;
       x0 = null;
@@ -401,7 +448,10 @@ export function passesSection(store, projects, onChange = () => {}) {
     const passes = boardingPasses(v.today, projects);
     count.textContent = `${passes.length}장`;
     passBoards = [];
-    passesBox.replaceChildren(...(passes.length ? passes.map(passEl) : [h('div', { class: 'bp bp-empty' }, h('p', null, '오늘 탑승할 주문이 없어요'), h('small', null, '나중에 목록에서 오늘로 옮기거나 새로 발권해요'))]), addTile());
+    shownPasses = passes;
+    // 폰 더미는 넘겨 본 티켓(frontId)이 맨 앞에 오게 돌린다. 넓은 화면 가로 레일은 원래 순서
+    const order = stacked() ? stackOrder(passes, frontId) : passes;
+    passesBox.replaceChildren(...(passes.length ? order.map(passEl) : [h('div', { class: 'bp bp-empty' }, h('p', null, '오늘 탑승할 주문이 없어요'), h('small', null, '나중에 목록에서 오늘로 옮기거나 새로 발권해요'))]), addTile());
 
     doneBox.replaceChildren(
       h('h3', null, `오늘 도착 ${v.doneToday.length}`),
@@ -515,6 +565,7 @@ export function passesSection(store, projects, onChange = () => {}) {
     if (!attached || passesBox.isConnected) return false;
     clearInterval(liveLoop);
     document.removeEventListener('visibilitychange', onVisible);
+    phoneQuery?.removeEventListener?.('change', onLayout);
     return true;
   };
   const liveLoop = setInterval(() => {
@@ -536,7 +587,7 @@ export function passesSection(store, projects, onChange = () => {}) {
     status,
     h('div', { class: 'bp-rail', 'aria-hidden': 'true' }),
     passesBox,
-    h('p', { class: 'bp-hint' }, '폰에서는 오른쪽으로 밀면 탑승 완료, 왼쪽으로 밀면 나중에. 누르면 뒷면을 봐요'),
+    h('p', { class: 'bp-hint' }, '폰에서는 옆으로 밀면 다음 티켓, 바코드 부분을 위로 올리면 탑승 완료. 누르면 뒷면을 봐요'),
     toast
   );
   const side = h('div', { class: 'bp-side' }, h('section', { class: 'side-card' }, doneBox), h('section', { class: 'side-card' }, laterBox));

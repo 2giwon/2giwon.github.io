@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { flightPrefix, boardingPasses, matchProject, towerStatus, TOWER_LABEL, PASS_LABEL, flapFrames, towerNowText, FLAP_ALPHA } from '../app/airport.mjs';
+import { flightPrefix, boardingPasses, matchProject, towerStatus, TOWER_LABEL, PASS_LABEL, flapFrames, towerNowText, FLAP_ALPHA, stackOrder, stepFront, swipeIntent, SWIPE_PX } from '../app/airport.mjs';
 import { restoreTask } from '../app/todo.mjs';
 
 const task = (id, over = {}) => ({ id, title: `할 일 ${id}`, stage: 'normal', doOn: '2026-11-26', status: 'todo', project: '', ...over });
@@ -123,4 +123,39 @@ test('A5. 되돌리기는 상태, 할 날, 끝낸 날을 이전 값으로 돌린
   assert.equal(back.tasks[0].doneOn, null);
   assert.equal(back.tasks[1], data.tasks[1]);
   assert.throws(() => restoreTask(data, 99, { status: 'todo', doOn: null, doneOn: null }));
+});
+
+// 폰 탑승권 더미 넘기기(11-27 사용자: "작업 리스트 티켓에서 다음 티켓을 보기가 힘들어", "옆으로 밀면 다음 티켓, 밑에서 위로 올리면 완료").
+// 예전에는 옆으로 밀면 바로 탑승 완료(오른쪽)나 나중에(왼쪽)로 처리돼서, 다음 티켓을 보려면 앞 티켓을 처리해야 했다
+const deck = ['a', 'b', 'c', 'd'].map((id) => ({ task: { id } }));
+const ids = (list) => list.map((p) => p.task.id);
+
+test('S1. 맨 앞 티켓이 앞에 오게 순서를 돌린다(나머지 순서는 그대로)', () => {
+  assert.deepEqual(ids(stackOrder(deck, null)), ['a', 'b', 'c', 'd']);
+  assert.deepEqual(ids(stackOrder(deck, 'c')), ['c', 'd', 'a', 'b']);
+  assert.deepEqual(ids(stackOrder(deck, 'zz')), ['a', 'b', 'c', 'd'], '없는 번호(처리돼 사라짐)면 처음부터');
+  assert.deepEqual(stackOrder([], 'a'), []);
+});
+
+test('S2. 다음, 이전 티켓으로 넘기고 끝에서는 처음으로 돌아온다', () => {
+  assert.equal(stepFront(deck, null, 1), 'b');
+  assert.equal(stepFront(deck, 'b', 1), 'c');
+  assert.equal(stepFront(deck, 'd', 1), 'a');
+  assert.equal(stepFront(deck, 'a', -1), 'd');
+  assert.equal(stepFront(deck, 'c', -1), 'b');
+  assert.equal(stepFront(deck, 'zz', 1), 'b', '없는 번호면 처음 티켓에서 센다');
+  assert.equal(stepFront([{ task: { id: 'x' } }], 'x', 1), 'x');
+  assert.equal(stepFront([], null, 1), null);
+});
+
+test('S3. 손동작: 옆으로 밀면 넘기기, 아래쪽을 잡고 위로 올리면 완료, 나머지는 아무것도 아님', () => {
+  const far = SWIPE_PX + 10;
+  assert.equal(swipeIntent({ dx: 20, dy: -10, lower: true }), null, '조금 움직임');
+  assert.equal(swipeIntent({ dx: -far, dy: 0, lower: false }), 'next', '왼쪽으로 밀면 다음 티켓');
+  assert.equal(swipeIntent({ dx: far, dy: 0, lower: true }), 'prev', '오른쪽으로 밀면 이전 티켓');
+  assert.equal(swipeIntent({ dx: 0, dy: -far, lower: true }), 'done', '아래쪽을 잡고 위로 올리면 완료');
+  assert.equal(swipeIntent({ dx: 0, dy: -far, lower: false }), null, '제목 쪽을 잡고 올리면 화면 스크롤(완료 아님)');
+  assert.equal(swipeIntent({ dx: 0, dy: far, lower: true }), null, '아래로 내리기는 아무것도 아님(나중에는 버튼으로만)');
+  assert.equal(swipeIntent({ dx: -far, dy: -(far - 5), lower: true }), 'next', '대각선은 더 많이 움직인 쪽');
+  assert.equal(swipeIntent({ dx: -40, dy: -far, lower: true }), 'done');
 });
