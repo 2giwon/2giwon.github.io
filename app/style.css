@@ -693,14 +693,16 @@ button.primary {
 .side-empty { margin: 0; font-size: 13px; color: var(--muted); }
 
 /* 귀가편 6211(#163 11-27): 시계 옆 추천 알약 + 드롭다운. 알약은 추천 경로의 노선 색(지선버스 초록, 4호선 하늘색) */
-.cm { --bus: #2fbf5b; --subway: #00a5de; position: relative; align-self: center; }
+/* 시계 묶음(dc-pair)은 아래쪽으로 맞춘다. 그림도 시계 칸 아래쪽 선에 맞춘다(11-27 사용자 요청) */
+.cm { --bus: #2fbf5b; --subway: #00a5de; position: relative; align-self: flex-end; display: flex; } /* flex: 그림 아래 글자 줄 여백(6px)을 없앤다 */
 .cm[hidden] { display: none; }
 /* 귀가편 그림(11-27 사용자 요청): 둘레 사각형 없이 여러 색 옆모습 그림만. 버스는 지선버스 초록, 지하철은 흰 몸통에 4호선 하늘색 띠.
    구석 배지는 남은 분, ?, !. 18:00 뒤와 실패는 그림을 흑백으로 흐리게 */
 .cm-tile {
-  position: relative; display: inline-grid; place-items: center; width: 72px; height: 48px; padding: 0; border: 0; border-radius: 10px;
+  position: relative; display: inline-grid; place-items: end center; width: 72px; height: 42px; padding: 0; border: 0; border-radius: 10px;
   background: transparent; font: inherit; cursor: pointer;
 }
+.cm-icon { display: block; line-height: 0; }
 .cm-icon svg { display: block; width: 68px; height: 42px; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, .35)); }
 .cm-tile.manual .cm-icon, .cm-tile.fail .cm-icon { filter: grayscale(1); opacity: .55; }
 .cm-tile.loading { background: color-mix(in srgb, var(--board-muted) 30%, transparent); animation: cm-shimmer 1.2s ease-in-out infinite; cursor: default; }
