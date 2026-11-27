@@ -1,57 +1,83 @@
-// 상태판의 "세션" 카드 (11-27). Claude 데스크탑 앱 세션마다 작은 캐릭터가 지금 무엇을 하는지 보여 준다.
-// 일하는 중은 책상에서 타자, 답 기다림은 손 흔들기, 확인 필요는 서류 들기, 끝남은 잠들기.
-// 캐릭터 그림은 이 저장소에서 직접 그린 SVG 다. 움직임은 style.css 의 .sess-char 규칙(동작 줄이기 설정을 따름)
-// 10초마다 다시 읽는다. 화면이 숨겨져 있으면 쉬고, 다시 보이면 바로 읽는다
+// 상태판의 "세션" 카드 (11-27). Claude 데스크탑 앱 세션들이 방 하나에 모여 지금 무엇을 하는지 보여 준다.
+// 일하는 중은 컴퓨터 의자에 앉기, 답 기다림은 "!", 확인 필요는 "?", 끝남은 러그 위에서 잠(app/session-room.mjs 가 자리를 정한다).
+// 방(nemo 가구 묶음, CC0)과 캐릭터(Pixel Gnome NPC 무료판) 그림은 비공개 personal-docs 에 있고 GitHub 토큰으로 읽는다.
+// 캐릭터 그림은 재배포 금지라 이 공개 저장소에 넣지 않는다. 그림을 못 받으면 방만 빼고 목록은 그대로 보인다.
+// 방은 0.5초마다 다음 프레임을 그린다. 화면이 숨겨졌거나 "동작 줄이기" 설정이면 멈춘다
+// 목록은 10초마다 다시 읽는다. 화면이 숨겨져 있으면 쉬고, 다시 보이면 바로 읽는다
 
 import { h, skeleton, failure, empty } from '../dom.mjs';
 import { loadToken } from '../token.mjs';
 import { LIVE_MS } from '../live.mjs';
 import {
-  loadBoard, boardView, canOpenSessions, sessionHref, KIND_LABEL, activityText, poseFor, sinceText,
+  loadBoard, boardView, canOpenSessions, sessionHref, KIND_LABEL, activityText, sinceText,
 } from '../sessions.mjs';
+import {
+  ART_FOLDER, CROP, CELL, EXTRA_FURNITURE, layoutRoom, frameCell, animFrame, loadRoomArt,
+} from '../session-room.mjs';
 
-const SVG_NS = 'http://www.w3.org/2000/svg';
+const FRAME_MS = 500;
+const ART_REPO = 'personal-docs';
+const SCALE = 3; // 캔버스는 방을 3배로 그리고, CSS 로 카드 폭에 맞춘다(도트가 덜 흐려지게)
+const KIND_COLOR = { waiting: '#f0a028', working: '#3fb950', review: '#58a6ff', done: '#8d8a80' };
 
-// 캐릭터 하나. 몸은 둥근 사각형, 머리는 원, 앞에 책상과 노트북. 동작에 쓰는 부분마다 class 를 붙여 CSS 로 보이고 움직인다
-const CHARACTER = `
-<g class="c-desk"><rect x="4" y="38" width="56" height="4" rx="2"/></g>
-<g class="c-laptop"><rect x="34" y="25" width="20" height="13" rx="2"/><rect class="c-screen" x="36" y="27" width="16" height="9" rx="1"/></g>
-<g class="c-body">
-  <rect class="c-torso" x="12" y="22" width="20" height="17" rx="7"/>
-  <circle class="c-head" cx="22" cy="15" r="9"/>
-  <g class="c-eyes-open"><circle cx="19" cy="14" r="1.6"/><circle cx="25.5" cy="14" r="1.6"/></g>
-  <g class="c-eyes-closed"><path d="M17 14.5 q2 1.6 4 0 M23.5 14.5 q2 1.6 4 0"/></g>
-</g>
-<g class="c-arm c-arm-type"><rect x="27" y="29" width="9" height="3.4" rx="1.7"/></g>
-<g class="c-arm c-arm-wave"><rect x="28" y="12" width="3.4" height="12" rx="1.7"/></g>
-<g class="c-paper"><rect x="29" y="18" width="10" height="13" rx="1.5"/><path d="M31 22 h6 M31 25 h6 M31 28 h4"/></g>
-<g class="c-zz"><text x="33" y="9">z</text><text x="39" y="5">z</text></g>`;
-
-function character(kind) {
-  const svg = document.createElementNS(SVG_NS, 'svg');
-  svg.setAttribute('viewBox', '0 0 64 44');
-  svg.setAttribute('class', `sess-char pose-${poseFor(kind)} kind-${kind}`);
-  svg.setAttribute('aria-hidden', 'true');
-  svg.innerHTML = CHARACTER; // 고정된 그림만 넣는다(세션 값은 넣지 않는다)
-  return svg;
+async function decodeImage(bytes) {
+  return createImageBitmap(new Blob([bytes], { type: 'image/png' }));
 }
 
-function rowEl(r, now, isMac) {
+/** 방 한 장면을 그린다. 방, 더 놓은 책상, 사람, 번호, 말풍선 순서 */
+function drawRoom(canvas, art, layout, frame) {
+  const x = canvas.getContext?.('2d');
+  if (!x) return;
+  const S = SCALE;
+  x.imageSmoothingEnabled = false;
+  x.clearRect(0, 0, canvas.width, canvas.height);
+  x.drawImage(art.room, CROP.x, CROP.y, CROP.w, CROP.h, 0, 0, CROP.w * S, CROP.h * S);
+  for (const [sx, sy, w, hh, dx, dy] of EXTRA_FURNITURE) {
+    x.drawImage(art.furniture, sx, sy, w, hh, (dx - CROP.x) * S, (dy - CROP.y) * S, w * S, hh * S);
+  }
+  // 아래쪽(앞)에 있는 사람을 나중에 그려 겹칠 때 자연스럽게
+  const actors = [...layout.actors].sort((a, b) => a.spot.y - b.spot.y);
+  for (const a of actors) {
+    const { row, col } = frameCell(a.pose, frame);
+    const sheet = a.sheet === 'woman' ? art.woman : art.man;
+    x.drawImage(sheet, col * CELL.w, (row - 1) * CELL.h, CELL.w, CELL.h,
+      (a.spot.x - CROP.x) * S, (a.spot.y - CROP.y) * S, CELL.w * S, CELL.h * S);
+  }
+  for (const a of actors) {
+    // 머리 위 번호 동그라미(목록 번호와 같다)와 말풍선. 그림판 칸에서 머리 꼭대기는 위에서 18도트, 누운 사람은 32도트
+    const hx = (a.spot.x + 40 - CROP.x) * S;
+    const hy = (a.spot.y + (a.pose === 'lie' ? 30 : 17) - CROP.y) * S;
+    x.fillStyle = KIND_COLOR[a.kind] ?? '#8d8a80';
+    x.beginPath(); x.arc(hx, hy - 5 * S, 4 * S, 0, Math.PI * 2); x.fill();
+    x.fillStyle = '#101214'; x.font = `bold ${5 * S}px system-ui, sans-serif`; x.textAlign = 'center';
+    x.fillText(String(a.n), hx, hy - 3.2 * S);
+    if (a.bubble) {
+      const bob = frame % 2 ? -1 : 0;
+      const bx = hx + 6 * S, by = hy - (13 - bob) * S;
+      x.fillStyle = a.bubble === 'z' ? 'rgba(185,195,255,.92)' : '#ffffff';
+      x.fillRect(bx, by, 10 * S, 9 * S);
+      x.fillStyle = a.bubble === '!' ? '#e0661b' : a.bubble === '?' ? '#2f6fd6' : '#3a3f6b';
+      x.fillText(a.bubble === 'z' ? 'Zz' : a.bubble, bx + 5 * S, by + 7 * S);
+    }
+  }
+}
+
+function rowEl(r, n, now, isMac) {
   const href = sessionHref(r, isMac);
   const second = activityText(r.activity) ?? r.detail ?? (r.titleMissing ? '앱 형식이 바뀌어 제목을 못 읽었어요' : null);
   const inner = [
-    character(r.kind),
+    h('span', { class: `sess-num kind-${r.kind}`, 'aria-hidden': 'true' }, String(n)),
     h(
       'span',
       { class: 'sess-text' },
       h('b', null, r.title),
-      second ? h('span', null, second) : null
-    ),
-    h(
-      'span',
-      { class: 'sess-meta' },
-      h('span', { class: `sess-kind kind-${r.kind}` }, KIND_LABEL[r.kind] ?? r.kind),
-      h('span', { class: 'sess-since' }, sinceText(r.since, now))
+      second ? h('span', null, second) : null,
+      h(
+        'span',
+        { class: 'sess-meta' },
+        h('span', { class: `sess-kind kind-${r.kind}` }, KIND_LABEL[r.kind] ?? r.kind),
+        h('span', { class: 'sess-since' }, sinceText(r.since, now))
+      )
     ),
   ];
   const label = `${r.title}, ${KIND_LABEL[r.kind] ?? ''}${second ? `, ${second}` : ''}`;
@@ -64,19 +90,56 @@ function rowEl(r, now, isMac) {
   );
 }
 
-export function sessionsCard({ fetchImpl = (...a) => fetch(...a), storage = localStorage, nav = navigator } = {}) {
+export function sessionsCard({
+  fetchImpl = (...a) => fetch(...a), storage = localStorage, nav = navigator, store = null,
+  getArtBytes = store ? (name) => store.mediaBytes(ART_REPO, ART_FOLDER, name) : null,
+} = {}) {
   const status = h('small', { class: 'sess-status' });
   const body = h('div', { class: 'sess-body' }, skeleton(3));
-  const card = h('section', { class: 'side-card sess', 'aria-label': 'Claude 세션 현황판' }, h('h3', null, '세션 ', status), body);
+  // 방 장면 자리. 목록을 다시 그려도 방은 그대로 두고 사람만 다시 놓는다
+  const canvas = h('canvas', { class: 'sess-room-canvas', width: CROP.w * SCALE, height: CROP.h * SCALE, role: 'img', 'aria-label': '세션들이 모인 방' });
+  const roomBox = h('div', { class: 'sess-room loading' }, h('div', { class: 'sess-room-wait' }));
+  const roomNote = h('p', { class: 'sess-room-note', hidden: true });
+  const card = h('section', { class: 'side-card sess', 'aria-label': 'Claude 세션 현황판' }, h('h3', null, '세션 ', status), roomBox, roomNote, body);
   const isMac = canOpenSessions(nav);
   let last = null; // 마지막으로 받은 목록(잠깐 실패해도 목록을 지우지 않으려고)
   let loading = false;
+  let art = { state: 'loading' };
+  let layout = { actors: [], overflow: 0 };
+  let showRoom = false;
+
+  // 방 그림은 카드를 만들 때 한 번만 받는다. 못 받으면 방만 빼고 목록은 그대로
+  if (getArtBytes) {
+    loadRoomArt(getArtBytes, decodeImage).then((r) => { art = r; paintRoom(); });
+  } else {
+    art = { state: 'failed', error: '그림을 읽을 저장소 연결이 없어요' };
+  }
+
+  function paintRoom() {
+    roomBox.hidden = !showRoom || art.state === 'failed';
+    roomNote.hidden = !showRoom || (art.state !== 'failed' && layout.overflow === 0);
+    if (!showRoom) return;
+    if (art.state === 'failed') {
+      roomNote.textContent = '방 그림을 불러오지 못했어요. 목록은 아래에 그대로 있어요';
+      return;
+    }
+    roomNote.textContent = layout.overflow ? `+${layout.overflow}명은 방에 자리가 없어 목록에만 있어요` : '';
+    if (art.state !== 'ready') return;
+    if (roomBox.classList.contains('loading')) {
+      roomBox.classList.remove('loading');
+      roomBox.replaceChildren(canvas);
+    }
+    drawRoom(canvas, art.images, layout, animFrame(frame, still()));
+  }
 
   function paint(result) {
     const now = Date.now();
     const view = boardView(result, now);
     status.textContent = '';
     card.classList.toggle('stale', !!view.stale);
+    showRoom = view.state === 'list' || view.state === 'empty' || (view.state === 'failed' && !!last);
+    layout = view.state === 'list' ? layoutRoom(view.rows) : view.state === 'empty' ? layoutRoom([]) : layout;
+    paintRoom();
     switch (view.state) {
       case 'loading':
         body.replaceChildren(skeleton(3));
@@ -107,7 +170,7 @@ export function sessionsCard({ fetchImpl = (...a) => fetch(...a), storage = loca
         // replaceChildren 은 null 을 "null" 글자로 넣으므로 빈 자리는 걸러 낸다
         body.replaceChildren(
           ...[
-            h('ul', { class: 'sess-list' }, view.rows.map((r) => rowEl(r, now, isMac))),
+            h('ul', { class: 'sess-list' }, view.rows.map((r, i) => rowEl(r, i + 1, now, isMac))),
             view.ageText ? h('p', { class: 'sess-age' }, view.ageText) : null,
             isMac ? null : h('p', { class: 'sess-hint' }, '맥 브라우저에서 누르면 데스크탑 앱의 그 세션으로 가요'),
           ].filter(Boolean)
@@ -116,6 +179,21 @@ export function sessionsCard({ fetchImpl = (...a) => fetch(...a), storage = loca
       }
     }
   }
+
+  // 방 움직이기: 0.5초마다 다음 프레임. "동작 줄이기" 설정이면 첫 프레임에 멈춘다
+  // 설정은 화면을 연 동안에도 바뀔 수 있어서 그릴 때마다 지금 값을 읽는다(codex P2 11-27)
+  const motion = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
+  const still = () => !!motion?.matches;
+  let frame = 0;
+  const animate = setInterval(() => {
+    if (gone() || document.hidden) return;
+    if (still()) {
+      if (frame !== 0) { frame = 0; paintRoom(); }
+      return;
+    }
+    frame += 1;
+    paintRoom();
+  }, FRAME_MS);
 
   async function load() {
     if (loading) return;
@@ -137,6 +215,7 @@ export function sessionsCard({ fetchImpl = (...a) => fetch(...a), storage = loca
     if (card.isConnected) attached = true;
     if (!attached || card.isConnected) return false;
     clearInterval(loop);
+    clearInterval(animate);
     document.removeEventListener('visibilitychange', onVisible);
     return true;
   };

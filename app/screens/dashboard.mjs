@@ -383,7 +383,7 @@ export function dashboardScreen(store, catalog) {
   tower.section.classList.add('ap-tower');
   const lounge = themesLink(store);
   lounge.classList.add('ap-lounge');
-  const sessions = sessionsCard();
+  const sessions = sessionsCard({ store }); // store: 방 그림을 비공개 저장소에서 읽는 데 쓴다
   sessions.classList.add('ap-sess');
   // PC 는 왼쪽(ap-main)과 오른쪽(ap-aside) 두 기둥. 폰은 두 기둥을 풀어(display: contents) 레일 → 오늘 도착과 나중에 → 관제탑 → 라운지 → 도착 안내 순으로 쌓는다
   return h(
@@ -391,6 +391,7 @@ export function dashboardScreen(store, catalog) {
     { class: 'airport' },
     h('div', { class: 'ap-main' }, rail, tower.section, lounge),
     // 귀가편 6211 은 탑승권 레일 머리의 시계 옆으로 옮겼다(#163, passes.mjs)
-    h('aside', { class: 'ap-aside' }, side, sessions, h('div', { class: 'ap-bottom' }, arrivalsSection(catalog), flightLogSection(catalog)))
+    // 세션 카드는 오른쪽 기둥 맨 위(오늘 도착 위, 11-27 사용자 요청)
+    h('aside', { class: 'ap-aside' }, sessions, side, h('div', { class: 'ap-bottom' }, arrivalsSection(catalog), flightLogSection(catalog)))
   );
 }

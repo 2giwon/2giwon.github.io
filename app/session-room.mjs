@@ -1,0 +1,90 @@
+// 세션 카드 "방" 장면 (11-27, 사용자가 고른 P 방 + W 캐릭터). 그림은 그리지 않고 자리와 그림판 칸만 계산한다.
+// 그림 원본은 비공개 personal-docs/claude-usage-bar/session-room/ 에 있고 화면(app/screens/sessions.mjs)이 토큰으로 읽어 그린다.
+//  - room.png, furniture.png: nemo 가구 묶음(CC0)
+//  - npc-man.png, npc-woman.png: Pixel Gnome NPC 무료판(재배포 금지라 공개 저장소에 두지 않는다)
+// 좌표는 모두 room.png(192x192) 기준 도트. 캐릭터 그림판 칸은 80x64 이고, spot 은 그 칸의 왼쪽 위가 놓일 자리다
+
+export const ART_FOLDER = 'claude-usage-bar/session-room';
+export const ART_FILES = { room: 'room.png', furniture: 'furniture.png', man: 'npc-man.png', woman: 'npc-woman.png' };
+
+/** 화면에 쓰는 방 부분(방 안쪽) */
+export const CROP = { x: 8, y: 36, w: 176, h: 96 };
+export const CELL = { w: 80, h: 64 };
+
+/** 원래 방의 컴퓨터 책상(x 64) 양옆에 같은 책상, 컴퓨터, 의자를 더 놓는다. [그림판 x, y, 너비, 높이, 방 x, 방 y] */
+const DESK = [16, 68, 16, 16];
+const COMPUTER = [179, 27, 10, 14];
+const CHAIR = [147, 128, 10, 14];
+export const EXTRA_FURNITURE = [48, 80].flatMap((x) => [
+  [...DESK, x, 66], [...COMPUTER, x + 3, 57], [...CHAIR, x + 3, 78],
+]);
+
+// 자리(그림판 칸의 왼쪽 위). 의자는 책상 x 48, 64, 80 에 맞춘다
+export const SEATS = [{ x: 32, y: 44 }, { x: 16, y: 44 }, { x: 48, y: 44 }];
+export const STANDS = [{ x: 0, y: 60 }, { x: 60, y: 66 }, { x: 84, y: 66 }, { x: 124, y: 62 }];
+export const LIES = [{ x: 104, y: 61 }, { x: 28, y: 58 }];
+export const ROOM_MAX = 6;
+
+const BUBBLE = { waiting: '!', review: '?', done: 'z' };
+
+/** 세션 번호 -> 남자 또는 여자. 같은 번호는 늘 같다(FNV-1a 와 마무리 섞기) */
+export function sheetFor(id) {
+  let hash = 2166136261;
+  for (const ch of String(id ?? '')) hash = Math.imul(hash ^ ch.charCodeAt(0), 16777619) >>> 0;
+  hash = (hash ^ (hash >>> 16)) >>> 0;
+  hash = Math.imul(hash, 0x45d9f3b) >>> 0;
+  hash = (hash ^ (hash >>> 16)) >>> 0;
+  return hash % 2 ? 'woman' : 'man';
+}
+
+/**
+ * 목록(이미 정렬됨) -> 방에 그릴 사람들. 번호 n 은 목록 순서(1부터).
+ * 일하는 중은 의자(앉기), 모자라면 서 있기. 답 기다림 !, 확인 필요 ? 는 서 있기. 끝남은 눕기, 모자라면 서서 졸기.
+ * 방에는 ROOM_MAX 명까지. 자리를 못 받은 사람과 넘친 사람은 overflow 로 센다
+ */
+export function layoutRoom(list) {
+  const free = { seat: [...SEATS], stand: [...STANDS], lie: [...LIES] };
+  const actors = [];
+  let overflow = 0;
+  (list ?? []).forEach((r, i) => {
+    if (i >= ROOM_MAX) { overflow += 1; return; }
+    let pose = 'stand';
+    let spot = null;
+    if (r.kind === 'working' && free.seat.length) { pose = 'sit'; spot = free.seat.shift(); }
+    else if (r.kind === 'done' && free.lie.length) { pose = 'lie'; spot = free.lie.shift(); }
+    else {
+      pose = r.kind === 'done' ? 'doze' : 'stand';
+      spot = free.stand.shift() ?? null;
+    }
+    if (!spot) { overflow += 1; return; }
+    actors.push({ n: i + 1, id: r.id, kind: r.kind, pose, spot, sheet: sheetFor(r.id), bubble: BUBBLE[r.kind] ?? null });
+  });
+  return { actors, overflow };
+}
+
+/** 동작과 프레임 -> 그림판 칸. 가만히(1줄)와 앉기(8줄)는 2장을 번갈아, 누워 자기(11줄)와 서서 졸기(9줄)는 1장 */
+export function frameCell(pose, frame) {
+  const f = Math.abs(Math.floor(frame || 0)) % 2;
+  if (pose === 'sit') return { row: 8, col: f };
+  if (pose === 'lie') return { row: 11, col: 0 };
+  if (pose === 'doze') return { row: 9, col: 0 };
+  return { row: 1, col: f };
+}
+
+/** 동작 줄이기 설정이면 첫 프레임에 멈춘다 */
+export const animFrame = (frame, reduced) => (reduced ? 0 : frame);
+
+/**
+ * 그림 4개를 받아 이미지로 바꾼다. getBytes(파일 이름) -> ArrayBuffer, decode(bytes) -> 이미지.
+ * 하나라도 못 받거나 못 풀면 failed(목록은 그대로 두고 방만 뺀다)
+ */
+export async function loadRoomArt(getBytes, decode) {
+  try {
+    const entries = await Promise.all(
+      Object.entries(ART_FILES).map(async ([key, name]) => [key, await decode(await getBytes(name))])
+    );
+    return { state: 'ready', images: Object.fromEntries(entries) };
+  } catch (e) {
+    return { state: 'failed', error: String(e?.message ?? e) };
+  }
+}

@@ -23,6 +23,7 @@ export const APP_FILES = [
   'app/media.mjs',
   'app/route.mjs',
   'app/samples.mjs',
+  'app/session-room.mjs',
   'app/sessions.mjs',
   'app/screens/commute.mjs',
   'app/screens/dashboard.mjs',
