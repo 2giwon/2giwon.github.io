@@ -12,7 +12,7 @@ import {
   loadBoard, boardView, canOpenSessions, sessionHref, KIND_LABEL, activityText, sinceText,
 } from '../sessions.mjs';
 import {
-  ART_FOLDER, CROP, CELL, CHAIR, EXTRA_FURNITURE, layoutRoom, frameCell, animFrame, loadRoomArt,
+  ART_FOLDER, CROP, CELL, CHAIR, EXTRA_FURNITURE, layoutRoom, frameCell, animFrame, loadRoomArt, actorAt,
 } from '../session-room.mjs';
 
 const FRAME_MS = 500;
@@ -91,7 +91,7 @@ function rowEl(r, n, now, isMac) {
     null,
     href
       ? h('a', { class: 'sess-row', href, 'data-id': r.id, title: '눌러서 데스크탑 앱에서 이 세션 열기', 'aria-label': `${label}. 눌러서 열기` }, inner)
-      : h('div', { class: 'sess-row', 'aria-label': label }, inner)
+      : h('div', { class: 'sess-row', 'data-id': r.id, 'aria-label': label }, inner)
   );
 }
 
@@ -112,6 +112,33 @@ export function sessionsCard({
   let art = { state: 'loading' };
   let layout = { actors: [], overflow: 0 };
   let showRoom = false;
+  let shownRows = []; // 지금 목록(방 번호 n = 순서 + 1)
+
+  // 방의 캐릭터 누르기 = 목록 줄 누르기(11-27 사용자 요청). 맥 브라우저는 그 세션을 열고,
+  // 폰처럼 데스크탑 앱을 못 여는 곳은 목록의 그 줄로 내려가 잠깐 강조한다
+  const roomPoint = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    return [CROP.x + ((e.clientX - rect.left) * CROP.w) / rect.width, CROP.y + ((e.clientY - rect.top) * CROP.h) / rect.height];
+  };
+  canvas.addEventListener('click', (e) => {
+    const actor = actorAt(layout, ...roomPoint(e));
+    const row = actor ? shownRows[actor.n - 1] : null;
+    if (!row) return;
+    const href = sessionHref(row, isMac);
+    if (href) {
+      location.href = href;
+      return;
+    }
+    const el = [...body.querySelectorAll('.sess-row')].find((r) => r.dataset.id === row.id);
+    if (!el) return;
+    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    el.classList.remove('flash');
+    void el.offsetWidth; // 같은 줄을 다시 눌러도 강조가 다시 보이게
+    el.classList.add('flash');
+  });
+  canvas.addEventListener('mousemove', (e) => {
+    canvas.style.cursor = actorAt(layout, ...roomPoint(e)) ? 'pointer' : '';
+  });
 
   // 방 그림은 카드를 만들 때 한 번만 받는다. 못 받으면 방만 빼고 목록은 그대로
   if (getArtBytes) {
@@ -144,6 +171,8 @@ export function sessionsCard({
     card.classList.toggle('stale', !!view.stale);
     showRoom = view.state === 'list' || view.state === 'empty' || (view.state === 'failed' && !!last);
     layout = view.state === 'list' ? layoutRoom(view.rows) : view.state === 'empty' ? layoutRoom([]) : layout;
+    if (view.state === 'list') shownRows = view.rows;
+    else if (view.state === 'empty') shownRows = [];
     paintRoom();
     switch (view.state) {
       case 'loading':

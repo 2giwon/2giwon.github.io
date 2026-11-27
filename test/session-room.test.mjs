@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { layoutRoom, frameCell, sheetFor, animFrame, loadRoomArt, ROOM_MAX, SEATS, STANDS, LIES } from '../app/session-room.mjs';
+import { layoutRoom, frameCell, sheetFor, animFrame, loadRoomArt, actorAt, ROOM_MAX, SEATS, STANDS, LIES } from '../app/session-room.mjs';
 
 // 세션 카드 "방" 장면 (11-27, 사용자가 고른 P 방 + W 캐릭터). 자리 배치와 그림 고르기만 검사한다(그림 자체는 화면 확인)
 
@@ -93,6 +93,37 @@ test('R11. 앉아서 일할 때는 프레임마다 몸이 1도트 오르내린�
   assert.equal(frameCell('sit', 0).dy, 0);
   assert.equal(frameCell('sit', 1).dy, 1);
   assert.equal(frameCell('stand', 1).dy ?? 0, 0);
+});
+
+test('R12. 방에서 누른 자리(방 도트 좌표)에 있는 캐릭터를 찾는다. 겹치면 앞(아래)에 있는 사람', () => {
+  const layout = layoutRoom(rows('waiting', 'working', 'done'));
+  const [stand, sit, lie] = layout.actors;
+  // 서 있는 사람 몸, 머리 위 번호와 말풍선 자리도 누를 수 있다
+  assert.equal(actorAt(layout, stand.spot.x + 40, stand.spot.y + 35)?.n, 1);
+  assert.equal(actorAt(layout, stand.spot.x + 50, stand.spot.y + 10)?.n, 1);
+  // 앉은 사람
+  assert.equal(actorAt(layout, sit.spot.x + 40, sit.spot.y + 30)?.n, 2);
+  // 누운 사람은 가로로 길다
+  assert.equal(actorAt(layout, lie.spot.x + 22, lie.spot.y + 40)?.n, 3);
+  // 빈 자리
+  assert.equal(actorAt(layout, 180, 128), null);
+  // 겹치면 아래(앞)에 그려진 사람
+  const overlap = { actors: [
+    { n: 1, spot: { x: 50, y: 40 }, pose: 'stand' },
+    { n: 2, spot: { x: 52, y: 50 }, pose: 'stand' },
+  ], overflow: 0 };
+  assert.equal(actorAt(overlap, 92, 75)?.n, 2);
+});
+
+test('R13. 번호와 말풍선을 먼저 판정한다(codex P2, P3): 붙어 앉은 두 사람의 번호, 누운 사람의 Zz 말풍선', () => {
+  const two = layoutRoom(rows('working', 'working'));
+  const [first] = two.actors;
+  // 첫 사람 번호 동그라미 가운데(머리 위)
+  assert.equal(actorAt(two, first.spot.x + 40, first.spot.y + 12)?.n, 1);
+  const sleeper = layoutRoom(rows('done'));
+  const lie = sleeper.actors[0];
+  // 누운 사람 말풍선(번호 오른쪽 위) 가운데
+  assert.equal(actorAt(sleeper, lie.spot.x + 51, lie.spot.y + 21)?.n, 1);
 });
 
 test('R8. 동작 줄이기 설정이면 프레임 0 고정', () => {

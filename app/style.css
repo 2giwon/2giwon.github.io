@@ -928,6 +928,10 @@ a.sess-row:hover, a.sess-row:focus-visible { background: var(--board-3); }
 .sess-room.loading .sess-room-wait { width: 100%; height: 100%; background: linear-gradient(90deg, var(--board-3) 25%, #34373c 50%, var(--board-3) 75%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .sess-room.loading .sess-room-wait { animation: none; } }
 .sess-room-note { margin: 0 0 8px; font-size: 11.5px; color: var(--board-muted); }
+/* 방의 캐릭터를 눌렀을 때(데스크탑 앱을 못 여는 곳) 목록의 그 줄을 잠깐 강조 */
+.sess-row.flash { animation: sess-flash 1.4s ease-out; }
+@keyframes sess-flash { 0%, 30% { background: var(--board-3); box-shadow: inset 0 0 0 1px var(--flap); } 100% { background: transparent; box-shadow: none; } }
+@media (prefers-reduced-motion: reduce) { .sess-row.flash { animation: none; background: var(--board-3); } }
 /* 넓은 화면: 왼쪽 큰 기둥 맨 위에서 방(왼쪽, 크게)과 목록(오른쪽) 두 칸 */
 @media (min-width: 960px) {
   .ap-main .sess { display: grid; grid-template-columns: minmax(0, 3fr) minmax(240px, 2fr); column-gap: 18px; align-items: start; }

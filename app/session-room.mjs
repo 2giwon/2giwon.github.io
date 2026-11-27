@@ -80,6 +80,34 @@ export function frameCell(pose, frame) {
   return { row: 1, col: f };
 }
 
+/**
+ * 방에서 누른 자리(room.png 도트 좌표)에 있는 사람. 몸과 머리 위 번호, 말풍선 자리까지 누를 수 있다.
+ * 겹치면 앞(아래, 나중에 그려진)에 있는 사람을 고른다. 없으면 null
+ */
+export function actorAt(layout, x, y) {
+  const actors = layout?.actors ?? [];
+  const inside = (b) => x >= b.l && x <= b.r && y >= b.t && y <= b.b;
+  const front = (list) => (list.length ? list.reduce((f, a) => (a.spot.y >= f.spot.y ? a : f)) : null);
+  // 1) 번호 동그라미와 말풍선(화면 그리기와 같은 좌표, 말풍선은 프레임마다 1도트 오르내림). 몸보다 위에 그려지므로 먼저 본다(codex P2, P3)
+  const labelHit = actors.filter((a) => {
+    const { x: sx, y: sy } = a.spot;
+    const off = a.pose === 'lie' ? 30 : 17; // 머리 위 기준점(sessions.mjs drawRoom 과 같은 값)
+    const cx = sx + 40, cy = sy + off - 5;
+    const label = { l: cx - 5, r: cx + 5, t: cy - 5, b: cy + 5 };
+    const bubble = { l: sx + 46, r: sx + 56, t: sy + off - 14, b: sy + off - 4 };
+    return inside(label) || (a.bubble && inside(bubble));
+  });
+  if (labelHit.length) return front(labelHit);
+  // 2) 몸: 그림판 칸 안에서 실제 그림이 있는 범위(서기, 앉기 x 32~48 y 18~48, 누운 사람 x 18~48 y 32~48)
+  const bodyHit = actors.filter((a) => {
+    const { x: sx, y: sy } = a.spot;
+    return inside(a.pose === 'lie'
+      ? { l: sx + 18, r: sx + 48, t: sy + 32, b: sy + 48 }
+      : { l: sx + 32, r: sx + 48, t: sy + 18, b: sy + 48 });
+  });
+  return front(bodyHit);
+}
+
 /** 동작 줄이기 설정이면 첫 프레임에 멈춘다 */
 export const animFrame = (frame, reduced) => (reduced ? 0 : frame);
 
