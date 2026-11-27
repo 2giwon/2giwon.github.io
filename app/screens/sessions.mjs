@@ -1,8 +1,8 @@
 // 상태판의 "세션" 카드 (11-27). Claude 데스크탑 앱 세션들이 방 하나에 모여 지금 무엇을 하는지 보여 준다.
-// 일하는 중은 컴퓨터 의자에 앉기, 답 기다림은 "!", 확인 필요는 "?", 끝남은 러그 위에서 잠(app/session-room.mjs 가 자리를 정한다).
-// 방(nemo 가구 묶음, CC0)과 캐릭터(Pixel Gnome NPC 무료판) 그림은 비공개 personal-docs 에 있고 GitHub 토큰으로 읽는다.
+// 일하는 중은 컴퓨터 의자에 앉기, 답 기다림은 "!", 확인 필요는 "?", 끝남은 침대, 러그, 벽난로 앞에서 쉬기(app/session-room.mjs 가 자리를 정한다).
+// 방(nemo 가구 묶음, CC0), 사람(Memao Fantasy 10명), 고양이(Elthen) 그림은 비공개 personal-docs 에 있고 GitHub 토큰으로 읽는다.
 // 캐릭터 그림은 재배포 금지라 이 공개 저장소에 넣지 않는다. 그림을 못 받으면 방만 빼고 목록은 그대로 보인다.
-// 방은 0.5초마다 다음 프레임을 그린다. 화면이 숨겨졌거나 "동작 줄이기" 설정이면 멈춘다
+// 방은 0.125초마다 다시 그린다(사람은 0.5초마다 다음 장, 놀기만 하는 고양이는 시각으로 계산). 화면이 숨겨졌거나 "동작 줄이기" 설정이면 멈춘다
 // 목록은 10초마다 다시 읽는다. 화면이 숨겨져 있으면 쉬고, 다시 보이면 바로 읽는다
 
 import { h, skeleton, failure, empty } from '../dom.mjs';
@@ -12,10 +12,16 @@ import {
   loadBoard, boardView, canOpenSessions, sessionHref, KIND_LABEL, activityText, sinceText,
 } from '../sessions.mjs';
 import {
-  ART_FOLDER, CROP, CELL, CHAIR, EXTRA_FURNITURE, layoutRoom, frameCell, animFrame, loadRoomArt, actorAt,
+  ART_FOLDER, CROP, CHAIR, EXTRA_FURNITURE, layoutRoom, frameCell, animFrame, loadRoomArt, headAt,
+  CAT_CELL, catAt, pickAt, depthOf, PCELL, PERSON_AT, frameXY, ARMCHAIR, ARMCHAIR_FRONT, ARMCHAIRS,
 } from '../session-room.mjs';
 
-const FRAME_MS = 500;
+/** 침대에 쓸 눕기 그림 부분(Memao 칸 안 x, y, 너비, 높이). 높이 16 이 돌린 뒤 침대 폭(16)이 된다 */
+const BED_SRC = [3, 27, 35, 16];
+
+// 방은 0.125초마다 다시 그린다(고양이가 부드럽게 걷게). 사람 그림은 지금처럼 0.5초마다(4번에 1번) 바뀐다
+const FRAME_MS = 125;
+const PEOPLE_EVERY = 4;
 const ART_REPO = 'personal-docs';
 const SCALE = 3; // 캔버스는 방을 3배로 그리고, CSS 로 카드 폭에 맞춘다(도트가 덜 흐려지게)
 const KIND_COLOR = { waiting: '#f0a028', working: '#3fb950', review: '#58a6ff', done: '#8d8a80' };
@@ -24,8 +30,26 @@ async function decodeImage(bytes) {
   return createImageBitmap(new Blob([bytes], { type: 'image/png' }));
 }
 
-/** 방 한 장면을 그린다. 방, 더 놓은 책상, 사람, 번호, 말풍선 순서 */
-function drawRoom(canvas, art, layout, frame) {
+/** 고양이를 그린다. 그림판은 오른쪽을 보는 옆모습이라 왼쪽을 볼 때는 좌우로 뒤집는다. cat.x, cat.y 는 발끝 가운데 */
+function drawCat(x, img, cat) {
+  const S = SCALE;
+  const sx = (cat.col) * CAT_CELL;
+  const sy = (cat.row - 1) * CAT_CELL;
+  const dx = Math.round(cat.x - CAT_CELL / 2 - CROP.x) * S;
+  const dy = Math.round(cat.y - CAT_CELL - CROP.y) * S;
+  if (!cat.flip) {
+    x.drawImage(img, sx, sy, CAT_CELL, CAT_CELL, dx, dy, CAT_CELL * S, CAT_CELL * S);
+    return;
+  }
+  x.save();
+  x.translate(dx + CAT_CELL * S, dy);
+  x.scale(-1, 1);
+  x.drawImage(img, sx, sy, CAT_CELL, CAT_CELL, 0, 0, CAT_CELL * S, CAT_CELL * S);
+  x.restore();
+}
+
+/** 방 한 장면을 그린다. 방, 더 놓은 책상, 사람과 고양이(앞뒤 순서대로), 번호, 말풍선 순서 */
+function drawRoom(canvas, art, layout, frame, cat) {
   const x = canvas.getContext?.('2d');
   if (!x) return;
   const S = SCALE;
@@ -35,13 +59,47 @@ function drawRoom(canvas, art, layout, frame) {
   for (const [sx, sy, w, hh, dx, dy] of EXTRA_FURNITURE) {
     x.drawImage(art.furniture, sx, sy, w, hh, (dx - CROP.x) * S, (dy - CROP.y) * S, w * S, hh * S);
   }
-  // 아래쪽(앞)에 있는 사람을 나중에 그려 겹칠 때 자연스럽게
-  const actors = [...layout.actors].sort((a, b) => a.spot.y - b.spot.y);
-  for (const a of actors) {
-    const { row, col, dy = 0 } = frameCell(a.pose, frame);
-    const sheet = a.sheet === 'woman' ? art.woman : art.man;
-    x.drawImage(sheet, col * CELL.w, (row - 1) * CELL.h, CELL.w, CELL.h,
-      (a.spot.x - CROP.x) * S, (a.spot.y + dy - CROP.y) * S, CELL.w * S, CELL.h * S);
+  // 앞을 보는 안락의자(LimeZu). 빈 의자도 늘 그리고, 앉은 사람이 있으면 사람 위에 팔걸이와 앞면을 한 번 더 덧그린다
+  const [ax, ay, aw, ah] = ARMCHAIR;
+  for (const [cx, cy] of ARMCHAIRS) {
+    x.drawImage(art.interiors, ax, ay, aw, ah, (cx - CROP.x) * S, (cy - CROP.y) * S, aw * S, ah * S);
+  }
+  // 아래쪽(앞)에 있는 사람과 고양이를 나중에 그려 겹칠 때 자연스럽게
+  const actors = [...layout.actors].sort((a, b) => depthOf(a) - depthOf(b));
+  const scene = actors.map((a) => ({ depth: depthOf(a), a }));
+  if (cat && art.cat) scene.push({ depth: cat.y, cat });
+  scene.sort((p, q) => p.depth - q.depth);
+  for (const item of scene) {
+    if (item.cat) { drawCat(x, art.cat, item.cat); continue; }
+    const { a } = item;
+    const { frame: f, dy = 0, turn } = frameCell(a.pose, frame);
+    const sheet = art.people[a.look];
+    const { sx, sy } = frameXY(f);
+    if (turn) {
+      // 침대: 눕기 그림(Memao 칸 x 3~38 y 27~43, 머리가 왼쪽)을 시계 방향 90도 돌려 머리가 위(베개)에 오게 한다.
+      // 침대 밖으로 다리가 나오지 않게 침대 안만 그리고, 이불과 발판을 다시 덧그려 이불 밖으로 머리만 보이게 한다
+      const [kx, ky, kw, kh] = a.spot.clip;
+      const [qx, qy, qw, qh] = a.spot.quilt;
+      const [bx, by, bw, bh] = BED_SRC;
+      x.save();
+      x.beginPath(); x.rect((kx - CROP.x) * S, (ky - CROP.y) * S, kw * S, kh * S); x.clip();
+      x.translate((a.spot.x + bh - CROP.x) * S, (a.spot.y - CROP.y) * S);
+      x.rotate(Math.PI / 2);
+      x.drawImage(sheet, sx + bx, sy + by, bw, bh, 0, 0, bw * S, bh * S);
+      x.restore();
+      x.drawImage(art.room, qx, qy, qw, qh, (qx - CROP.x) * S, (qy - CROP.y) * S, qw * S, qh * S);
+      continue;
+    }
+    // Memao 칸(48x48)을 자리 칸(80x64) 안 PERSON_AT 위치에 그린다(발끝과 가운데를 예전 자리에 맞춘다)
+    x.drawImage(sheet, sx, sy, PCELL, PCELL,
+      (a.spot.x + PERSON_AT.x - CROP.x) * S, (a.spot.y + PERSON_AT.y + dy - CROP.y) * S, PCELL * S, PCELL * S);
+    // 안락의자에 앉은 사람: 팔걸이와 앉는 판 앞면을 덧그려 팔 옆과 다리를 가린다(의자에 앉아 이쪽을 보는 앞모습)
+    if (a.spot.armchair) {
+      const [cx, cy] = a.spot.armchair;
+      for (const [px, py, pw, ph] of ARMCHAIR_FRONT) {
+        x.drawImage(art.interiors, ax + px, ay + py, pw, ph, (cx + px - CROP.x) * S, (cy + py - CROP.y) * S, pw * S, ph * S);
+      }
+    }
     // 앉은 사람: 의자를 한 번 더 덧그려 등받이가 다리를 가리게 한다(의자에 앉아 컴퓨터를 보는 뒷모습)
     if (a.spot.chair) {
       const [cx, cy] = a.spot.chair;
@@ -49,9 +107,10 @@ function drawRoom(canvas, art, layout, frame) {
     }
   }
   for (const a of actors) {
-    // 머리 위 번호 동그라미(목록 번호와 같다)와 말풍선. 그림판 칸에서 머리 꼭대기는 위에서 18도트, 누운 사람은 32도트
-    const hx = (a.spot.x + 40 - CROP.x) * S;
-    const hy = (a.spot.y + (a.pose === 'lie' ? 30 : 17) - CROP.y) * S;
+    // 머리 위 번호 동그라미(목록 번호와 같다)와 말풍선. 머리 위 기준점은 누르기 판정과 같은 headAt
+    const head = headAt(a);
+    const hx = (head.x - CROP.x) * S;
+    const hy = (head.y - CROP.y) * S;
     x.fillStyle = KIND_COLOR[a.kind] ?? '#8d8a80';
     x.beginPath(); x.arc(hx, hy - 5 * S, 4 * S, 0, Math.PI * 2); x.fill();
     x.fillStyle = '#101214'; x.font = `bold ${5 * S}px system-ui, sans-serif`; x.textAlign = 'center';
@@ -120,8 +179,16 @@ export function sessionsCard({
     const rect = canvas.getBoundingClientRect();
     return [CROP.x + ((e.clientX - rect.left) * CROP.w) / rect.width, CROP.y + ((e.clientY - rect.top) * CROP.h) / rect.height];
   };
+  // 고양이를 누른 시각. 누르면 그 자리에서 잠깐 점프나 놀라기를 한다(세션과는 상관없는 장식)
+  let pokedAt = null;
+  const currentCat = () => catAt(Date.now(), { reduced: still(), pokedAt });
   canvas.addEventListener('click', (e) => {
-    const actor = actorAt(layout, ...roomPoint(e));
+    const pick = pickAt(layout, art.images?.cat ? currentCat() : null, ...roomPoint(e));
+    if (pick?.cat) {
+      if (!still()) { pokedAt = Date.now(); paintRoom(); }
+      return;
+    }
+    const actor = pick?.actor;
     const row = actor ? shownRows[actor.n - 1] : null;
     if (!row) return;
     const href = sessionHref(row, isMac);
@@ -137,7 +204,9 @@ export function sessionsCard({
     el.classList.add('flash');
   });
   canvas.addEventListener('mousemove', (e) => {
-    canvas.style.cursor = actorAt(layout, ...roomPoint(e)) ? 'pointer' : '';
+    // 동작 줄이기면 고양이는 눌러도 반응하지 않아서 손가락 모양을 보이지 않는다(리뷰 P3)
+    const pick = pickAt(layout, art.images?.cat ? currentCat() : null, ...roomPoint(e));
+    canvas.style.cursor = pick?.actor || (pick?.cat && !still()) ? 'pointer' : '';
   });
 
   // 방 그림은 카드를 만들 때 한 번만 받는다. 못 받으면 방만 빼고 목록은 그대로
@@ -161,7 +230,7 @@ export function sessionsCard({
       roomBox.classList.remove('loading');
       roomBox.replaceChildren(canvas);
     }
-    drawRoom(canvas, art.images, layout, animFrame(frame, still()));
+    drawRoom(canvas, art.images, layout, animFrame(Math.floor(tick / PEOPLE_EVERY), still()), currentCat());
   }
 
   function paint(result) {
@@ -214,18 +283,18 @@ export function sessionsCard({
     }
   }
 
-  // 방 움직이기: 0.5초마다 다음 프레임. "동작 줄이기" 설정이면 첫 프레임에 멈춘다
+  // 방 움직이기: 0.125초마다 다시 그린다(사람은 4번에 1번 다음 장, 고양이는 시각으로 계산). "동작 줄이기" 설정이면 첫 장에 멈춘다
   // 설정은 화면을 연 동안에도 바뀔 수 있어서 그릴 때마다 지금 값을 읽는다(codex P2 11-27)
   const motion = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
   const still = () => !!motion?.matches;
-  let frame = 0;
+  let tick = 0;
   const animate = setInterval(() => {
     if (gone() || document.hidden) return;
     if (still()) {
-      if (frame !== 0) { frame = 0; paintRoom(); }
+      if (tick !== 0) { tick = 0; paintRoom(); }
       return;
     }
-    frame += 1;
+    tick += 1;
     paintRoom();
   }, FRAME_MS);
 
