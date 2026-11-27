@@ -51,7 +51,8 @@ test('R5. 동작과 프레임 -> 그림판 칸(줄은 1부터, 칸은 0부터)',
   assert.deepEqual(frameCell('stand', 0), { row: 1, col: 0 });
   assert.deepEqual(frameCell('stand', 1), { row: 1, col: 1 });
   assert.deepEqual(frameCell('stand', 2), { row: 1, col: 0 });
-  assert.deepEqual(frameCell('sit', 1), { row: 8, col: 1 });
+  // 일하는 중은 책상(컴퓨터)을 바라보는 뒷모습(3줄). 옆모습 앉기(8줄)는 책상 옆에 서 있는 것처럼 보였다(11-27 사용자 지적)
+  assert.deepEqual(frameCell('sit', 1), { row: 3, col: 1, dy: 1 });
   assert.deepEqual(frameCell('lie', 5), { row: 11, col: 0 });
   assert.deepEqual(frameCell('doze', 3), { row: 9, col: 0 });
 });
@@ -74,6 +75,24 @@ test('R7. 그림 불러오기: 모두 받으면 ready, 하나라도 실패하면
   assert.equal(bad.state, 'failed');
   const badDecode = await loadRoomArt(async () => new ArrayBuffer(4), async () => { throw new Error('broken png'); });
   assert.equal(badDecode.state, 'failed');
+});
+
+test('R10. 의자마다 덧그릴 의자 자리가 있고, 사람 가운데가 의자 가운데에 온다(의자 등받이가 다리를 가려 앉은 모습)', () => {
+  for (const seat of SEATS) {
+    assert.ok(Array.isArray(seat.chair) && seat.chair.length === 2);
+    const chairCenter = seat.chair[0] + 5; // 의자 그림 폭 10
+    const personCenter = seat.x + 40; // 그림판 칸 80 의 가운데
+    assert.ok(Math.abs(chairCenter - personCenter) <= 1, `${chairCenter} vs ${personCenter}`);
+    // 머리는 의자 위로 보이고(사람 위쪽 18도트가 의자보다 위), 다리는 의자에 가린다(사람 아래쪽 47도트가 의자 안)
+    assert.ok(seat.y + 18 < seat.chair[1]);
+    assert.ok(seat.y + 47 >= seat.chair[1] && seat.y + 47 <= seat.chair[1] + 14);
+  }
+});
+
+test('R11. 앉아서 일할 때는 프레임마다 몸이 1도트 오르내린다(타자 치는 느낌), 다른 동작은 그대로', () => {
+  assert.equal(frameCell('sit', 0).dy, 0);
+  assert.equal(frameCell('sit', 1).dy, 1);
+  assert.equal(frameCell('stand', 1).dy ?? 0, 0);
 });
 
 test('R8. 동작 줄이기 설정이면 프레임 0 고정', () => {

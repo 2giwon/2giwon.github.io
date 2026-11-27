@@ -14,13 +14,19 @@ export const CELL = { w: 80, h: 64 };
 /** 원래 방의 컴퓨터 책상(x 64) 양옆에 같은 책상, 컴퓨터, 의자를 더 놓는다. [그림판 x, y, 너비, 높이, 방 x, 방 y] */
 const DESK = [16, 68, 16, 16];
 const COMPUTER = [179, 27, 10, 14];
-const CHAIR = [147, 128, 10, 14];
+export const CHAIR = [147, 128, 10, 14];
 export const EXTRA_FURNITURE = [48, 80].flatMap((x) => [
   [...DESK, x, 66], [...COMPUTER, x + 3, 57], [...CHAIR, x + 3, 78],
 ]);
 
-// 자리(그림판 칸의 왼쪽 위). 의자는 책상 x 48, 64, 80 에 맞춘다
-export const SEATS = [{ x: 32, y: 44 }, { x: 16, y: 44 }, { x: 48, y: 44 }];
+// 자리(그림판 칸의 왼쪽 위). 의자는 책상 x 48, 64, 80 에 맞춘다.
+// 앉은 사람은 컴퓨터를 바라보는 뒷모습으로 그리고, 그 위에 의자(chair: 방 x, y)를 덧그려 등받이가 다리를 가리게 한다.
+// 무료판에는 뒷모습 앉기 그림이 없어서 이렇게 앉은 모습을 만든다(옆모습 앉기는 책상 옆에 서 있는 것처럼 보였다, 11-27)
+export const SEATS = [
+  { x: 32, y: 44, chair: [67, 78] },
+  { x: 16, y: 44, chair: [51, 78] },
+  { x: 48, y: 44, chair: [83, 78] },
+];
 export const STANDS = [{ x: 0, y: 60 }, { x: 60, y: 66 }, { x: 84, y: 66 }, { x: 124, y: 62 }];
 export const LIES = [{ x: 104, y: 61 }, { x: 28, y: 58 }];
 export const ROOM_MAX = 6;
@@ -62,10 +68,13 @@ export function layoutRoom(list) {
   return { actors, overflow };
 }
 
-/** 동작과 프레임 -> 그림판 칸. 가만히(1줄)와 앉기(8줄)는 2장을 번갈아, 누워 자기(11줄)와 서서 졸기(9줄)는 1장 */
+/**
+ * 동작과 프레임 -> 그림판 칸. 가만히(1줄)는 2장을 번갈아, 누워 자기(11줄)와 서서 졸기(9줄)는 1장.
+ * 앉아서 일하기는 뒷모습(3줄) 2장을 번갈아 그리고, 몸을 1도트씩 오르내려(dy) 타자 치는 느낌을 준다
+ */
 export function frameCell(pose, frame) {
   const f = Math.abs(Math.floor(frame || 0)) % 2;
-  if (pose === 'sit') return { row: 8, col: f };
+  if (pose === 'sit') return { row: 3, col: f, dy: f };
   if (pose === 'lie') return { row: 11, col: 0 };
   if (pose === 'doze') return { row: 9, col: 0 };
   return { row: 1, col: f };

@@ -12,7 +12,7 @@ import {
   loadBoard, boardView, canOpenSessions, sessionHref, KIND_LABEL, activityText, sinceText,
 } from '../sessions.mjs';
 import {
-  ART_FOLDER, CROP, CELL, EXTRA_FURNITURE, layoutRoom, frameCell, animFrame, loadRoomArt,
+  ART_FOLDER, CROP, CELL, CHAIR, EXTRA_FURNITURE, layoutRoom, frameCell, animFrame, loadRoomArt,
 } from '../session-room.mjs';
 
 const FRAME_MS = 500;
@@ -38,10 +38,15 @@ function drawRoom(canvas, art, layout, frame) {
   // 아래쪽(앞)에 있는 사람을 나중에 그려 겹칠 때 자연스럽게
   const actors = [...layout.actors].sort((a, b) => a.spot.y - b.spot.y);
   for (const a of actors) {
-    const { row, col } = frameCell(a.pose, frame);
+    const { row, col, dy = 0 } = frameCell(a.pose, frame);
     const sheet = a.sheet === 'woman' ? art.woman : art.man;
     x.drawImage(sheet, col * CELL.w, (row - 1) * CELL.h, CELL.w, CELL.h,
-      (a.spot.x - CROP.x) * S, (a.spot.y - CROP.y) * S, CELL.w * S, CELL.h * S);
+      (a.spot.x - CROP.x) * S, (a.spot.y + dy - CROP.y) * S, CELL.w * S, CELL.h * S);
+    // 앉은 사람: 의자를 한 번 더 덧그려 등받이가 다리를 가리게 한다(의자에 앉아 컴퓨터를 보는 뒷모습)
+    if (a.spot.chair) {
+      const [cx, cy] = a.spot.chair;
+      x.drawImage(art.furniture, CHAIR[0], CHAIR[1], CHAIR[2], CHAIR[3], (cx - CROP.x) * S, (cy - CROP.y) * S, CHAIR[2] * S, CHAIR[3] * S);
+    }
   }
   for (const a of actors) {
     // 머리 위 번호 동그라미(목록 번호와 같다)와 말풍선. 그림판 칸에서 머리 꼭대기는 위에서 18도트, 누운 사람은 32도트
