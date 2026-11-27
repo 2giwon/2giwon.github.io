@@ -18,12 +18,13 @@ export const ICONS = {
   // Claude 테마: 물감 팔레트(상태판 테마 배너, 11-26)
   palette:
     '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.9 1.8-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4c0-4.4-4-8-9-8z"/><circle cx="7.5" cy="11" r="1" fill="currentColor"/><circle cx="10" cy="7" r="1" fill="currentColor"/><circle cx="14.5" cy="7" r="1" fill="currentColor"/><circle cx="17" cy="10.5" r="1" fill="currentColor"/>',
-  // 귀가편 그림 타일(11-27): 버스 앞모습(앞유리, 전조등, 바퀴)
+  // 귀가편 그림 타일(11-27 사용자 요청: 옆모습 단색 실루엣). 오른쪽이 앞. 창문은 몸통을 뚫어(evenodd) 타일 바탕색이 보이고,
+  // 바퀴 자리는 몸통을 둥글게 파내 바퀴가 또렷하게 떨어져 보인다
   bus:
-    '<rect x="5" y="3" width="14" height="16" rx="3"/><path d="M5 11h14"/><path d="M8 3.5h8"/><circle cx="8.5" cy="15" r="1" fill="currentColor"/><circle cx="15.5" cy="15" r="1" fill="currentColor"/><path d="M7.5 19v2M16.5 19v2"/>',
-  // 귀가편 그림 타일(11-27): 지하철 앞모습(창 두 개, 전조등, 선로)
+    '<path fill="currentColor" stroke="none" fill-rule="evenodd" d="M3.4 5.5H20q2.6 0 2.6 2.6V16h-2.3a2.8 2.8 0 0 0-5.6 0H9.3a2.8 2.8 0 0 0-5.6 0H1.4V7.5q0-2 2-2zM3.4 8h3v3.4h-3zM7.6 8h3v3.4h-3zM11.8 8h3v3.4h-3zM16 8h2.2v3.4H16zM19.4 8h1.9v5h-1.9z"/><circle cx="6.5" cy="16.4" r="2.1" fill="currentColor" stroke="none"/><circle cx="17.5" cy="16.4" r="2.1" fill="currentColor" stroke="none"/>',
+  // 지하철 옆모습: 둥근 앞코, 창문 줄, 바퀴 네 개, 선로
   subway:
-    '<rect x="5" y="3" width="14" height="15" rx="4"/><rect x="8" y="6" width="3" height="4" rx="1"/><rect x="13" y="6" width="3" height="4" rx="1"/><circle cx="8.5" cy="14" r="1" fill="currentColor"/><circle cx="15.5" cy="14" r="1" fill="currentColor"/><path d="M8 18l-2 3M16 18l2 3M7 21h10"/>',
+    '<path fill="currentColor" stroke="none" fill-rule="evenodd" d="M2.6 5.5H17q5.4 0 5.4 5.6V15.5H1.4V6.7q0-1.2 1.2-1.2zM3.6 8h3v3h-3zM7.8 8h3v3h-3zM12 8h3v3h-3zM16.4 8h2.4q1.6.3 2.2 3h-4.6z"/><circle cx="4.6" cy="17" r="1.3" fill="currentColor" stroke="none"/><circle cx="8" cy="17" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="17" r="1.3" fill="currentColor" stroke="none"/><circle cx="18.4" cy="17" r="1.3" fill="currentColor" stroke="none"/><path d="M1 19.6h22" stroke-width="1.6"/>',
 };
 
 /** 아이콘 SVG 글자. 모르는 이름이면 빈 글자(화면이 깨지지 않게). */
