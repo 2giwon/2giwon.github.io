@@ -8,7 +8,7 @@
 // - 테스트 스위치: 주소에 ?commute=auto 나 ?commute=manual 을 붙이면 시각과 상관없이 보인다
 
 import { h, skeleton, failure } from '../dom.mjs';
-import { iconSvg } from '../icons.mjs';
+import { vehicleSvg } from '../icons.mjs';
 import { BUS_API, commuteMode, catchableBus, homePlan, badgeText, waitText, dataAgeSec, busList, staleText, ROUTE } from '../commute.mjs';
 
 const TICK_MS = 30_000;
@@ -34,7 +34,7 @@ let seq = 0; // 드롭다운 id 를 겹치지 않게
 
 export function commuteBadge() {
   const id = `cm-drop-${++seq}`;
-  const icon = h('span', { class: 'cm-icon', html: iconSvg('bus') });
+  const icon = h('span', { class: 'cm-icon', html: vehicleSvg('bus') });
   const badge = h('span', { class: 'cm-badge' });
   const tile = h('button', { type: 'button', class: 'cm-tile loading', 'aria-expanded': 'false', 'aria-controls': id, 'aria-label': '귀가편 불러오는 중' }, icon, badge);
   const drop = h('div', { class: 'cm-drop', id, role: 'region', 'aria-label': '귀가편 자세히', hidden: true });
@@ -81,7 +81,7 @@ export function commuteBadge() {
   /** 타일 모양. kind: bus, subway, manual, fail, loading */
   function paintTile(kind, { badgeText: b = '', label, hurry = false } = {}) {
     tile.className = `cm-tile ${kind}${hurry ? ' hurry' : ''}`;
-    icon.innerHTML = iconSvg(kind === 'subway' ? 'subway' : 'bus');
+    icon.innerHTML = vehicleSvg(kind === 'subway' ? 'subway' : 'bus');
     badge.textContent = b;
     badge.hidden = !b;
     tile.setAttribute('aria-label', label);

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ICONS, iconSvg, themeIconName } from '../app/icons.mjs';
+import { ICONS, iconSvg, themeIconName, vehicleSvg } from '../app/icons.mjs';
 
 test('위 막대 아이콘 6개가 모두 있다', () => {
   for (const name of ['folder', 'refresh', 'auto', 'sun', 'moon', 'key-off']) assert.ok(ICONS[name], name);
@@ -17,8 +17,16 @@ test('아이콘은 화면 읽기 프로그램이 건너뛰는 24칸 SVG 이고, 
   }
 });
 
-test('귀가편 그림 타일용 버스, 지하철 그림이 있다(11-27)', () => {
-  for (const name of ['bus', 'subway']) assert.ok(ICONS[name], name);
+test('귀가편 그림: 여러 색으로 칠한 버스, 지하철 옆모습(11-27 사용자 요청). 화면 읽기 프로그램은 건너뛴다', () => {
+  for (const name of ['bus', 'subway']) {
+    const svg = vehicleSvg(name);
+    assert.match(svg, /^<svg /, name);
+    assert.match(svg, /aria-hidden="true"/, name);
+    assert.match(svg, /fill="#/, name); // 글자색 하나가 아니라 직접 고른 색으로 칠한다
+    assert.match(svg, /<\/svg>$/, name);
+  }
+  assert.equal(vehicleSvg('nope'), '');
+  assert.equal(ICONS.bus, undefined); // 위 막대 아이콘 묶음에서는 뺐다
 });
 
 test('모르는 아이콘 이름이면 빈 글자를 돌려준다(화면이 깨지지 않게)', () => {
