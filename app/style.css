@@ -913,8 +913,9 @@ button.primary {
 .token-screen a { color: var(--flap); }
 .token-screen button.primary { background: var(--flap); color: var(--board); }
 
-/* ─── 세션 카드 (11-27): Claude 데스크탑 앱 세션들이 모인 방 ───
-   일하는 중 의자에 앉기, 답 기다림 !, 확인 필요 ?, 끝남 러그 위에서 잠. 방은 app/session-room.mjs, 그림은 비공개 personal-docs */
+/* ─── 세션 카드 (11-27): Claude 데스크탑 앱 세션들이 모인 다섯 방짜리 "세션 집" ───
+   일하는 중 작업실, 답 기다림 !와 확인 필요 ?는 현관, 끝남은 거실, 침실, 식당에서 쉬기.
+   자리는 app/session-room.mjs, 그림은 비공개 personal-docs. 집은 카드 맨 위 가로 전체, 목록은 그 아래(사용자 결정 11-27) */
 .sess { --k-waiting: #f0a028; --k-working: #3fb950; --k-review: #58a6ff; --k-done: #8d8a80; }
 .sess h3 { display: flex; align-items: baseline; gap: 8px; }
 .sess-status { font-size: 12px; font-weight: 500; color: var(--k-waiting); }
@@ -923,21 +924,18 @@ button.primary {
 a.sess-row:hover, a.sess-row:focus-visible { background: var(--board-3); }
 .sess-num { width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--board); background: var(--k-done); }
 .sess-num.kind-waiting { background: var(--k-waiting); } .sess-num.kind-working { background: var(--k-working); } .sess-num.kind-review { background: var(--k-review); }
-.sess-room { margin: 0 0 10px; border-radius: 8px; overflow: hidden; aspect-ratio: 176 / 96; background: #000; }
+.sess-room { margin: 0 0 10px; border-radius: 8px; overflow: hidden; aspect-ratio: 384 / 224; background: #000; }
 .sess-room-canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
 .sess-room.loading .sess-room-wait { width: 100%; height: 100%; background: linear-gradient(90deg, var(--board-3) 25%, #34373c 50%, var(--board-3) 75%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .sess-room.loading .sess-room-wait { animation: none; } }
 .sess-room-note { margin: 0 0 8px; font-size: 11.5px; color: var(--board-muted); }
-/* 방의 캐릭터를 눌렀을 때(데스크탑 앱을 못 여는 곳) 목록의 그 줄을 잠깐 강조 */
+/* 집의 캐릭터를 눌렀을 때(데스크탑 앱을 못 여는 곳) 목록의 그 줄을 잠깐 강조 */
 .sess-row.flash { animation: sess-flash 1.4s ease-out; }
 @keyframes sess-flash { 0%, 30% { background: var(--board-3); box-shadow: inset 0 0 0 1px var(--flap); } 100% { background: transparent; box-shadow: none; } }
 @media (prefers-reduced-motion: reduce) { .sess-row.flash { animation: none; background: var(--board-3); } }
-/* 넓은 화면: 왼쪽 큰 기둥 맨 위에서 방(왼쪽, 크게)과 목록(오른쪽) 두 칸 */
+/* 넓은 화면: 집은 가로 전체 그대로 두고, 목록만 두 줄로 나눠 세로 길이를 줄인다(처음에는 방 60%, 목록 40% 두 칸이었다) */
 @media (min-width: 960px) {
-  .ap-main .sess { display: grid; grid-template-columns: minmax(0, 3fr) minmax(240px, 2fr); column-gap: 18px; align-items: start; }
-  .ap-main .sess > h3 { grid-column: 1 / -1; }
-  .ap-main .sess > .sess-room, .ap-main .sess > .sess-room-note { grid-column: 1; }
-  .ap-main .sess > .sess-body { grid-column: 2; grid-row: 2 / span 2; max-height: 400px; overflow-y: auto; }
+  .ap-main .sess .sess-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 12px; }
 }
 .sess-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .sess-text b { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
