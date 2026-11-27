@@ -4,6 +4,8 @@
 // - 같은 결과를 20초 동안 다시 써서 여러 화면이 열려 있어도 요청 수를 아낀다
 // 인증키는 Cloudflare 비밀값 SEOUL_BUS_KEY 에 공공데이터포털의 "일반 인증키(Encoding)" 를 그대로 넣는다.
 
+import { handleBoard, createOwnerCache, durableStore, SessionBoard } from './board.mjs';
+
 const ROUTE_ID = '100100289'; // 6211
 const STOP_ORD = '80'; // 이촌동두산위브트레지움.한강대우아파트(03215)
 const NODEUL_ORD = '83'; // 노들역(20014)
@@ -12,6 +14,9 @@ const CACHE_SEC = 20;
 const FIELDS = ['stNm', 'arsId', 'arrmsg1', 'arrmsg2', 'traTime1', 'traTime2', 'vehId1', 'vehId2', 'mkTm'];
 
 let recent = null; // { at, body } 최근 결과(20초)
+
+// 세션 현황판(11-27)은 같은 Worker 의 /board 경로에서 돈다. 작업노트 CSP 에 이 주소가 이미 있어서 주소를 새로 두지 않았다
+const ownerCache = createOwnerCache();
 
 const pick = (item) => (item ? Object.fromEntries(FIELDS.map((k) => [k, item[k] ?? null])) : null);
 
@@ -22,8 +27,13 @@ function json(body, status, cors) {
   });
 }
 
+export { SessionBoard };
+
 export default {
   async fetch(request, env, ctx) {
+    if (new URL(request.url).pathname === '/board') {
+      return handleBoard(request, env, { store: durableStore(env), cache: ownerCache, now: Date.now, fetchImpl: fetch });
+    }
     const origin = request.headers.get('Origin') ?? '';
     const cors = ALLOWED.includes(origin) ? { 'Access-Control-Allow-Origin': origin, Vary: 'Origin' } : null;
     if (!cors) return json({ error: '허용하지 않은 주소' }, 403, {});

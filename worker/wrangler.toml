@@ -3,3 +3,18 @@
 name = "bus-6211"
 main = "bus-6211.js"
 compatibility_date = "2026-11-01"
+
+# 세션 현황판(11-27): /board 경로. 맥 메뉴 막대 앱이 세션 목록을 올리고 작업노트가 읽는다.
+# 쓰기 열쇠는 `npx wrangler secret put BOARD_WRITE_KEY` 로 Cloudflare 에만 넣는다.
+# 읽기는 GitHub 토큰 주인이 BOARD_OWNER 일 때만 허락한다
+[vars]
+BOARD_OWNER = "2giwon"
+
+# 목록은 Durable Object 한 곳에 둔다. 무료 요금제는 SQLite 저장 방식만 쓸 수 있다
+[[durable_objects.bindings]]
+name = "SESSION_BOARD"
+class_name = "SessionBoard"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SessionBoard"]

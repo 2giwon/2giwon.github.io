@@ -3,6 +3,7 @@
 // - 관제탑 띠: 프로젝트마다 상태 하나(결항, 탑승 중, 지연, 도착, 대기). 누르면 운항 정보(최신 핸드오프의 지금 상태, 다음 할 일, 미결)
 // - 옆 칸: 오늘 도착(끝낸 일), 나중에 탑승, 도착 안내(최신 문서), 운항 기록(최근 14일 그래프)
 // - 라운지 창문: Claude 테마
+// - 세션 카드: Claude 데스크탑 앱 세션마다 캐릭터로 지금 하는 일(sessions.mjs, 11-27)
 // PC 는 두 칸(왼쪽 레일과 관제탑, 오른쪽 옆 칸), 폰은 한 줄로 쌓는다(style.css .airport)
 
 import { h, skeleton, failure, empty, errorText, koDate } from '../dom.mjs';
@@ -16,6 +17,7 @@ import { loadThemeBanner } from '../themes.mjs';
 import { towerStatus, flightPrefix, TOWER_LABEL, towerNowText } from '../airport.mjs';
 import { VIDEO_REPO, VIDEO_TASKS_PATH, STATUS_LABEL, parseTaskList, nextUp } from '../video.mjs';
 import { LAB } from '../catalog.mjs';
+import { sessionsCard } from './sessions.mjs';
 
 const TIMELINE_DAYS = 14;
 const LATEST_COUNT = 10;
@@ -381,12 +383,14 @@ export function dashboardScreen(store, catalog) {
   tower.section.classList.add('ap-tower');
   const lounge = themesLink(store);
   lounge.classList.add('ap-lounge');
+  const sessions = sessionsCard();
+  sessions.classList.add('ap-sess');
   // PC 는 왼쪽(ap-main)과 오른쪽(ap-aside) 두 기둥. 폰은 두 기둥을 풀어(display: contents) 레일 → 오늘 도착과 나중에 → 관제탑 → 라운지 → 도착 안내 순으로 쌓는다
   return h(
     'div',
     { class: 'airport' },
     h('div', { class: 'ap-main' }, rail, tower.section, lounge),
     // 귀가편 6211 은 탑승권 레일 머리의 시계 옆으로 옮겼다(#163, passes.mjs)
-    h('aside', { class: 'ap-aside' }, side, h('div', { class: 'ap-bottom' }, arrivalsSection(catalog), flightLogSection(catalog)))
+    h('aside', { class: 'ap-aside' }, side, sessions, h('div', { class: 'ap-bottom' }, arrivalsSection(catalog), flightLogSection(catalog)))
   );
 }

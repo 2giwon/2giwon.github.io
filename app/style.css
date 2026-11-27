@@ -546,13 +546,13 @@ button.primary {
 .board-title small { font-size: 12px; font-weight: 400; color: var(--muted); }
 
 /* 칸 배치. PC: 왼쪽(레일, 관제탑, 라운지) + 오른쪽(오늘 도착과 나중에, 도착 안내와 운항 기록) */
-.airport { display: grid; gap: 18px; margin-top: 16px; grid-template-columns: minmax(0, 1fr); grid-template-areas: 'rail' 'top' 'tower' 'lounge' 'bottom'; }
+.airport { display: grid; gap: 18px; margin-top: 16px; grid-template-columns: minmax(0, 1fr); grid-template-areas: 'rail' 'top' 'sess' 'tower' 'lounge' 'bottom'; }
 .ap-main, .ap-aside { display: contents; }
-.ap-rail { grid-area: rail; } .ap-top { grid-area: top; } .ap-tower { grid-area: tower; } .ap-lounge { grid-area: lounge; } .ap-bottom { grid-area: bottom; }
+.ap-rail { grid-area: rail; } .ap-top { grid-area: top; } .ap-sess { grid-area: sess; } .ap-tower { grid-area: tower; } .ap-lounge { grid-area: lounge; } .ap-bottom { grid-area: bottom; }
 @media (min-width: 960px) {
   .airport { grid-template-columns: minmax(0, 1fr) 320px; grid-template-areas: none; align-items: start; }
   .ap-main, .ap-aside { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
-  .ap-rail, .ap-top, .ap-tower, .ap-lounge, .ap-bottom { grid-area: auto; }
+  .ap-rail, .ap-top, .ap-sess, .ap-tower, .ap-lounge, .ap-bottom { grid-area: auto; }
 }
 .later-list { max-height: 340px; overflow-y: auto; }
 .ap-bottom, .bp-side { display: flex; flex-direction: column; gap: 14px; }
@@ -912,3 +912,56 @@ button.primary {
 .token-screen .token-form input { background: var(--board-2); color: var(--board-ink); border-color: var(--board-3); }
 .token-screen a { color: var(--flap); }
 .token-screen button.primary { background: var(--flap); color: var(--board); }
+
+/* ─── 세션 카드 (11-27): Claude 데스크탑 앱 세션마다 작은 캐릭터 ───
+   일하는 중 타자, 답 기다림 손 흔들기, 확인 필요 서류 들기, 끝남 잠들기. 그림은 app/screens/sessions.mjs 의 SVG */
+.sess { --k-waiting: #f0a028; --k-working: #3fb950; --k-review: #58a6ff; --k-done: #8d8a80; }
+.sess h3 { display: flex; align-items: baseline; gap: 8px; }
+.sess-status { font-size: 12px; font-weight: 500; color: var(--k-waiting); }
+.sess-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.sess-row { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 8px; color: inherit; text-decoration: none; }
+a.sess-row:hover, a.sess-row:focus-visible { background: var(--board-3); }
+.sess-text { display: flex; flex-direction: column; min-width: 0; }
+.sess-text b { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sess-text span { font-size: 11.5px; color: var(--board-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sess-meta { display: flex; flex-direction: column; align-items: flex-end; font-size: 11px; white-space: nowrap; }
+.sess-since { color: var(--board-muted); font-variant-numeric: tabular-nums; }
+.sess-kind.kind-waiting { color: var(--k-waiting); } .sess-kind.kind-working { color: var(--k-working); }
+.sess-kind.kind-review { color: var(--k-review); } .sess-kind.kind-done { color: var(--k-done); }
+.sess-age, .sess-hint { margin: 8px 0 0; font-size: 11.5px; color: var(--board-muted); }
+.sess.stale .sess-list { opacity: .55; }
+
+/* 캐릭터 */
+.sess-char { width: 52px; height: 36px; overflow: visible; }
+.sess-char .c-desk rect { fill: var(--board-3); }
+.sess-char .c-laptop rect { fill: #3a3e44; } .sess-char .c-screen { fill: #1d2125; }
+.sess-char .c-torso, .sess-char .c-head { fill: var(--k); }
+.sess-char .c-eyes-open circle { fill: var(--board); }
+.sess-char .c-eyes-closed path { fill: none; stroke: var(--board); stroke-width: 1.4; stroke-linecap: round; }
+.sess-char .c-arm rect { fill: var(--k); filter: brightness(.88); }
+.sess-char .c-paper rect { fill: var(--board-ink); } .sess-char .c-paper path { stroke: var(--board-muted); stroke-width: 1; }
+.sess-char .c-zz text { font: 700 7px/1 system-ui, sans-serif; fill: var(--board-muted); }
+.sess-char.kind-waiting { --k: var(--k-waiting); } .sess-char.kind-working { --k: var(--k-working); }
+.sess-char.kind-review { --k: var(--k-review); } .sess-char.kind-done { --k: var(--k-done); }
+/* 동작마다 보일 부분 */
+.sess-char .c-eyes-closed, .sess-char .c-arm, .sess-char .c-paper, .sess-char .c-zz { display: none; }
+.sess-char.pose-type .c-arm-type, .sess-char.pose-wave .c-arm-wave, .sess-char.pose-paper .c-paper { display: inline; }
+.sess-char.pose-sleep .c-eyes-open { display: none; }
+.sess-char.pose-sleep .c-eyes-closed, .sess-char.pose-sleep .c-zz { display: inline; }
+.sess-char.pose-wave .c-laptop, .sess-char.pose-paper .c-laptop { opacity: .35; }
+/* 움직임 */
+.sess-char.pose-type .c-arm-type { animation: sess-type .32s steps(2) infinite; }
+.sess-char.pose-type .c-screen { animation: sess-screen 1.6s ease-in-out infinite; }
+.sess-char.pose-type .c-body { animation: sess-bob 1.6s ease-in-out infinite; }
+.sess-char.pose-wave .c-arm-wave { transform-origin: 29.7px 23px; animation: sess-wave 1s ease-in-out infinite; }
+.sess-char.pose-paper .c-paper { animation: sess-bob 2.4s ease-in-out infinite; }
+.sess-char.pose-sleep .c-body { transform-origin: 22px 39px; animation: sess-breathe 3.2s ease-in-out infinite; }
+.sess-char.pose-sleep .c-zz text { animation: sess-z 2.4s ease-in-out infinite; }
+.sess-char.pose-sleep .c-zz text + text { animation-delay: 1.2s; }
+@keyframes sess-type { 50% { transform: translateY(-1.6px); } }
+@keyframes sess-screen { 50% { fill: #2f5d3a; } }
+@keyframes sess-bob { 50% { transform: translateY(-1px); } }
+@keyframes sess-wave { 0%, 100% { transform: rotate(-12deg); } 50% { transform: rotate(18deg); } }
+@keyframes sess-breathe { 50% { transform: scaleY(.95); } }
+@keyframes sess-z { 0% { opacity: 0; transform: translateY(2px); } 40% { opacity: 1; } 100% { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .sess-char * { animation: none !important; } }
