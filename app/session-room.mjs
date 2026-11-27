@@ -75,8 +75,11 @@ export const CHAIR = [147, 128, 10, 14];
 export const SEATS = DESK_X.map((dx) => ({ x: dx - 32, y: 18, chair: [dx + 3, 52] }));
 /** 책상이 다 찼을 때 일하는 중이 서는 작업실 자리(발끝 y 104) */
 export const WORK_STANDS = [{ x: 140, y: 56 }, { x: 170, y: 56 }];
-/** 현관 서는 자리 여섯(세 명씩 두 줄, 발끝 y 178, 214). 답 기다림 !, 확인 필요 ? 가 문 앞에서 기다린다 */
-export const DOOR_STANDS = [130, 166].flatMap((y) => [-16, 14, 44].map((x) => ({ x, y })));
+/**
+ * 거실 의자가 다 찼을 때 답 기다림, 확인 필요가 서는 거실 오른쪽 자리(벽난로 앞, 발끝 y 205).
+ * 처음에는 현관 서는 자리 여섯이었는데 11-27 사용자가 "대답 기다릴 때 거실로 와서 의자에 앉아서 대기"로 바꿨다(WAIT_SEATS)
+ */
+export const WAIT_STANDS = [{ x: 290, y: 157 }, { x: 320, y: 157 }];
 /** 쉬는 자리 아홉이 다 찼을 때 끝남이 서서 조는 거실 자리 */
 export const DOZE_STANDS = [{ x: 220, y: 162 }, { x: 250, y: 162 }];
 
@@ -110,17 +113,27 @@ const inBed = (bx, by) => ({ x: bx, y: by + 3, clip: [bx, by, 16, 27], quilt: [b
 //  - armchair: 거실 소파 두 자리와 안락의자 둘에 앞모습으로 앉아 쉬기(앞면 덧그리기)
 //  - eat, drink: 식당 식탁 뒤에서 먹기(주먹밥), 마시기(컵). 식탁을 덧그려 다리를 가린다
 //  - lie: 거실 러그에 눕기(눕기 칸 190)
+const SOFA_LEFT = seatIn(SOFA, SOFA_AT, 0, FRONT_PARTS.sofa);
+const SOFA_RIGHT = seatIn(SOFA, SOFA_AT, 16, FRONT_PARTS.sofa);
+const ARMCHAIR_LEFT = seatIn(ARMCHAIR, ARMCHAIRS[0], 0, FRONT_PARTS.armchair);
+const ARMCHAIR_RIGHT = seatIn(ARMCHAIR, ARMCHAIRS[1], 0, FRONT_PARTS.armchair);
 export const REST = [
   { pose: 'bed', spot: inBed(24, 30) },
-  { pose: 'armchair', spot: seatIn(SOFA, SOFA_AT, 0, FRONT_PARTS.sofa) },
+  { pose: 'armchair', spot: SOFA_LEFT },
   { pose: 'eat', spot: atTable(270) },
   { pose: 'bed', spot: inBed(56, 30) },
-  { pose: 'armchair', spot: seatIn(ARMCHAIR, ARMCHAIRS[0], 0, FRONT_PARTS.armchair) },
+  { pose: 'armchair', spot: ARMCHAIR_LEFT },
   { pose: 'drink', spot: atTable(288) },
-  { pose: 'armchair', spot: seatIn(SOFA, SOFA_AT, 16, FRONT_PARTS.sofa) },
-  { pose: 'armchair', spot: seatIn(ARMCHAIR, ARMCHAIRS[1], 0, FRONT_PARTS.armchair) },
+  { pose: 'armchair', spot: SOFA_RIGHT },
+  { pose: 'armchair', spot: ARMCHAIR_RIGHT },
   { pose: 'lie', spot: { x: 143, y: 155 } },
 ];
+/**
+ * 답 기다림, 확인 필요가 먼저 앉는 거실 의자(소파 두 자리, 안락의자 둘). 끝남은 이 의자가 비었을 때만 앉는다(사용자 결정 11-27).
+ * 앉은 채로 옆자리 사람과 대화하는 짝: 소파 두 자리, 안락의자 둘
+ */
+export const WAIT_SEATS = [SOFA_LEFT, SOFA_RIGHT, ARMCHAIR_LEFT, ARMCHAIR_RIGHT];
+const WAIT_PAIRS = [[SOFA_LEFT, SOFA_RIGHT], [ARMCHAIR_LEFT, ARMCHAIR_RIGHT]];
 /** 집에 그리는 최대 인원. Memao 가 10명이라 늘 서로 다른 캐릭터가 된다(사용자 결정 11-27) */
 export const ROOM_MAX = 10;
 
@@ -148,14 +161,16 @@ export function restFor(id) {
 
 /**
  * 목록(이미 정렬됨) -> 집에 그릴 사람들. 번호 n 은 목록 순서(1부터).
- * 일하는 중은 작업실 책상(앉기), 모자라면 작업실에 서기. 답 기다림 !, 확인 필요 ? 는 현관에 서기.
+ * 일하는 중은 작업실 책상(앉기), 모자라면 작업실에 서기.
+ * 답 기다림 !, 확인 필요 ? 는 거실 의자(WAIT_SEATS)에 먼저 앉고, 모자라면 거실 오른쪽에 서기(WAIT_STANDS).
+ * 거실 의자를 기다림이 먼저 갖도록 기다림부터 자리를 주고, 그다음 나머지에게 목록 순서대로 준다.
  * 끝남은 좋아하는 쉬는 자리(restFor)로 가고, 앞선 사람이 차지했으면 REST 순서대로 다음 빈 자리로 간다.
  * 아홉 곳이 다 차면 거실에서 서서 졸기.
- * 캐릭터는 좋아하는 캐릭터(lookFor)를 쓰고, 집에 이미 같은 캐릭터가 있으면 다음 캐릭터로 넘어간다.
+ * 캐릭터는 좋아하는 캐릭터(lookFor)를 쓰고, 집에 이미 같은 캐릭터가 있으면 다음 캐릭터로 넘어간다(목록 순서).
  * 집에는 ROOM_MAX 명까지. 자리를 못 받은 사람과 넘친 사람은 overflow 로 센다
  */
 export function layoutRoom(list) {
-  const free = { seat: [...SEATS], work: [...WORK_STANDS], door: [...DOOR_STANDS], doze: [...DOZE_STANDS], rest: REST.map(() => true) };
+  const free = { seat: [...SEATS], work: [...WORK_STANDS], wait: [...WAIT_STANDS], doze: [...DOZE_STANDS], rest: REST.map(() => true) };
   const usedLooks = new Set();
   const takeLook = (id) => {
     const start = lookFor(id);
@@ -173,25 +188,43 @@ export function layoutRoom(list) {
     }
     return null;
   };
-  const actors = [];
-  let overflow = 0;
-  (list ?? []).forEach((r, i) => {
-    if (i >= ROOM_MAX) { overflow += 1; return; }
-    let pose = 'stand';
-    let spot = null;
-    if (r.kind === 'working') {
-      spot = free.seat.shift() ?? null;
-      if (spot) pose = 'sit';
-      else spot = free.work.shift() ?? null;
-    } else if (r.kind === 'done') {
-      const rest = takeRest(r.id);
-      if (rest) { pose = rest.pose; spot = rest.spot; }
-      else { pose = 'doze'; spot = free.doze.shift() ?? null; }
+  const items = (list ?? []).slice(0, ROOM_MAX);
+  let overflow = Math.max(0, (list ?? []).length - ROOM_MAX);
+  const placed = new Map(); // 목록 순서 -> { pose, spot }
+  const waits = (r) => r.kind !== 'working' && r.kind !== 'done';
+  // 1) 기다림: 비어 있는 거실 의자부터
+  items.forEach((r, i) => {
+    if (!waits(r)) return;
+    const seat = WAIT_SEATS.find((s) => free.rest[REST.findIndex((x) => x.spot === s)]);
+    if (seat) {
+      free.rest[REST.findIndex((x) => x.spot === seat)] = false;
+      placed.set(i, { pose: 'armchair', spot: seat });
     } else {
-      spot = free.door.shift() ?? null;
+      const spot = free.wait.shift();
+      if (spot) placed.set(i, { pose: 'stand', spot });
     }
-    if (!spot) { overflow += 1; return; }
-    actors.push({ n: i + 1, id: r.id, kind: r.kind, pose, spot, look: takeLook(r.id), bubble: BUBBLE[r.kind] ?? null });
+  });
+  // 2) 일하는 중과 끝남: 목록 순서대로
+  items.forEach((r, i) => {
+    if (waits(r)) return;
+    if (r.kind === 'working') {
+      const seat = free.seat.shift();
+      const spot = seat ?? free.work.shift();
+      if (spot) placed.set(i, { pose: seat ? 'sit' : 'stand', spot });
+      return;
+    }
+    const rest = takeRest(r.id);
+    if (rest) placed.set(i, { pose: rest.pose, spot: rest.spot });
+    else {
+      const spot = free.doze.shift();
+      if (spot) placed.set(i, { pose: 'doze', spot });
+    }
+  });
+  const actors = [];
+  items.forEach((r, i) => {
+    const p = placed.get(i);
+    if (!p) { overflow += 1; return; }
+    actors.push({ n: i + 1, id: r.id, kind: r.kind, pose: p.pose, spot: p.spot, look: takeLook(r.id), bubble: BUBBLE[r.kind] ?? null });
   });
   return { actors, overflow };
 }
@@ -200,21 +233,33 @@ export function layoutRoom(list) {
  * Memao 칸 번호(CREDITS.md 의 그림판 설명과 같다). 먹기와 마시기는 그림판을 크게 그려 확인했다(11-27):
  * 200~202 앞모습 주먹밥을 들고 한 입, 268~271 앞모습 컵을 입에. 먹기는 들기, 한 입, 내리기, 한 입 순서로 돌린다
  */
-export const FRAMES = { front: 0, back: 4, lie: 190, eat: [200, 201, 202, 201], drink: [268, 269, 270, 271] };
+export const FRAMES = {
+  front: 0, back: 4, lie: 190, eat: [200, 201, 202, 201], drink: [268, 269, 270, 271],
+  // 걷기 여섯 장씩(11-27 크게 그리고, 두 캐릭터의 얼굴 살색이 칸 가운데에서 어느 쪽에 있는지 재서 방향을 확인했다)
+  walk: { down: 16, up: 22, left: 28, right: 34 },
+  // 옆을 보고 가만히 네 장씩(대화할 때 서로 마주 본다). 8 이 왼쪽, 12 가 오른쪽(살색 위치로 확인, 예전 기록은 반대였다)
+  face: { left: 8, right: 12 },
+  // 앞을 보고 쪼그려 앉기 두 장(고양이 쓰다듬기)
+  crouch: [180, 181],
+};
 
 /**
  * 동작과 프레임 -> Memao 칸 번호. 가만히 앞모습(0~3)과 뒷모습(4~7)은 4장을 번갈아 그린다.
  * 앉아서 일하기는 뒷모습에 몸을 1도트씩 오르내려(dy) 타자 치는 느낌을 준다.
  * 침대(bed)는 눕기 그림을 90도 돌려(turn) 그린다. 안락의자, 소파(armchair)는 앞모습 가만히에 팔걸이와 앞면을 덧그린다.
- * 서서 조는 그림이 없어서 서서 졸기(doze)는 앞모습 첫 장(머리 위 Zz 로 자는 것을 보인다)
+ * 서서 조는 그림이 없어서 서서 졸기(doze)는 앞모습 첫 장(머리 위 Zz 로 자는 것을 보인다).
+ * 걷기(walk)는 가는 방향(dir: down, up, left, right)의 여섯 장, 대화(face)는 상대를 보는 옆모습 네 장, 쓰다듬기(crouch)는 쪼그려 앉기 두 장
  */
-export function frameCell(pose, frame) {
+export function frameCell(pose, frame, dir = 'down') {
   const n = Math.abs(Math.floor(frame || 0));
   if (pose === 'sit') return { frame: FRAMES.back + (n % 4), dy: n % 2 };
   if (pose === 'bed') return { frame: FRAMES.lie, turn: true };
   if (pose === 'lie') return { frame: FRAMES.lie };
   if (pose === 'doze') return { frame: FRAMES.front };
   if (pose === 'eat' || pose === 'drink') return { frame: FRAMES[pose][n % 4] };
+  if (pose === 'walk') return { frame: (FRAMES.walk[dir] ?? FRAMES.walk.down) + (n % 6) };
+  if (pose === 'face') return { frame: (FRAMES.face[dir] ?? FRAMES.face.left) + (n % 4) };
+  if (pose === 'crouch') return { frame: FRAMES.crouch[n % 2] };
   return { frame: FRAMES.front + (n % 4) };
 }
 
@@ -241,14 +286,22 @@ export function labelScale(cssWidth) {
 /**
  * 번호 동그라미(가운데 cx, cy, 반지름 r)와 말풍선 꼬리표(l, r, t, b). 화면 그리기와 누르기 판정이 같은 값을 쓴다.
  * 번호는 k = 1 이면 반지름 4도트(예전 크기)이고, 아래 끝을 머리 위에 붙인 채 위로 커진다.
- * 말풍선은 번호 동그라미 오른쪽 위에 붙은 8x7(k 배) 꼬리표다. 처음에는 번호 오른쪽에 10x10 으로 두고 키웠는데,
- * 폰에서 현관(30도트 간격)의 "!" 가 옆 사람 번호에 가려 안 보였다(11-27 캡처)
+ * 말풍선은 번호 동그라미 바로 위에 붙은 8x7(k 배) 꼬리표다. 처음에는 번호 오른쪽에 10x10 으로 두고 키웠는데 폰에서 현관(30도트 간격)의
+ * "!" 가 옆 사람 번호에 가렸고, 오른쪽 위 꼬리표로 바꾼 뒤에는 거실 소파와 안락의자(16~22도트 간격)에서 320px 폰일 때 또 가렸다(11-27).
+ * 옆 사람은 옆에 있으니 위아래로 쌓으면 겹치지 않는다.
+ * mood 는 할 일 꼬리표(하트, 대화 "...")로, 번호 왼쪽에 붙인다(눌러도 고르지 않는다)
  */
 export function labelBoxes(a, k = 1) {
   const h = headAt(a);
   const label = { cx: h.x, cy: h.y - 1 - 4 * k, r: 4 * k };
-  const by = label.cy - label.r;
-  return { label, bubble: { l: h.x, r: h.x + 8 * k, t: by - 3.5 * k, b: by + 3.5 * k } };
+  const top = label.cy - label.r;
+  // 그림 위쪽 끝(침대처럼 머리가 위에 있는 사람)에서는 꼬리표를 그림 안으로 내린다(폰에서 Zz 가 잘렸다, codex P2 11-27)
+  const lift = Math.max(0, -(top - 6 * k));
+  return {
+    label,
+    bubble: { l: h.x - 4 * k, r: h.x + 4 * k, t: top - 6 * k + lift, b: top + k + lift },
+    mood: { l: h.x - label.r - 8 * k, r: h.x - label.r, t: label.cy - 3.5 * k, b: label.cy + 3.5 * k },
+  };
 }
 
 /**
@@ -348,7 +401,8 @@ export const CAT_ACTS = {
  * 짝수 번호(침실, 식당, 현관)와 홀수 번호(작업실, 거실 둘)를 번갈아 가서 늘 다른 자리로 걷는다
  */
 export const CAT_SPOTS = [
-  { x: 60, y: 100 }, { x: 150, y: 110 }, { x: 290, y: 108 }, { x: 330, y: 204 }, { x: 39, y: 200 }, { x: 240, y: 205 },
+  // 거실 벽난로 앞 자리는 기다림 서기(WAIT_STANDS)와 겹쳐서 x 330 에서 308, y 212 로 옮겼다(11-27)
+  { x: 60, y: 100 }, { x: 150, y: 110 }, { x: 290, y: 108 }, { x: 308, y: 212 }, { x: 39, y: 200 }, { x: 240, y: 205 },
 ];
 export const CAT_BLOCK_MS = 30000;
 const CAT_SPEED = { walk: 16, run: 40 }; // 초당 도트
@@ -484,4 +538,242 @@ export function pickAt(layout, cat, x, y, k = 1) {
   if (actor && catHit) return cat.y > depthOf(actor) ? { cat: true } : { actor };
   if (actor) return { actor };
   return catHit ? { cat: true } : null;
+}
+
+// ---------------------------------------------------------------------------
+// 세션 집 생활(11-27, 계획 personal-docs claude-usage-bar/plans/2026-11-27-session-life-plan.md).
+// 사용자: "일을 시키면 컴퓨터 방으로 걸어가서 작업, 끝나고 쉴 때는 방이나 거실 소파로 이동해서 쉬기, 대답 기다릴 때 거실 의자에 앉아서 대기,
+// 쉬거나 대기 상태일 때는 고양이를 만지거나 밥을 먹거나 대화를 하거나 쉬거나".
+//  - 걸어가기: 상태가 바뀌어 자리가 바뀌면 화면이 기억한 발 위치에서 새 자리까지 문 구멍을 거쳐 걷는다(updateWalks)
+//  - 할 일: 끝남은 1~2분마다 한 번 식당에서 먹기, 고양이 쓰다듬기, 다른 끝남과 대화를 하러 걸어갔다 돌아온다.
+//          기다림은 앉은 채로만 옆자리와 대화하거나 다가온 고양이를 쓰다듬는다(사용자 결정)
+// 할 일은 고양이처럼 시각과 세션 번호로만 정한다. 그래서 다시 그려도 튀지 않고 맥과 폰에서 같다
+
+/** 할 일 구간. 고양이 구간과 같게 해서 고양이가 놀 자리에 도착한 뒤에 쓰다듬으러 온다 */
+export const ACT_BLOCK_MS = CAT_BLOCK_MS;
+const WALK_SPEED = 24; // 초당 도트
+const WALK_MAX_MS = 8000; // 먼 길도 8초 안에(그만큼 빨리 걷는다)
+const ACT_ARRIVE_MS = 18000; // 구간 시작 뒤 이때 할 일 자리에 닿는다(고양이는 구간의 60% 안에 놀 자리에 닿는다)
+const ACT_END_MS = 28000; // 이때까지 하고 돌아간다
+/** 대화하는 두 사람이 서는 자리(현관, 침실 바닥). 왼쪽 사람은 오른쪽을, 오른쪽 사람은 왼쪽을 본다 */
+const TALK_SPOTS = [[{ x: 30, y: 190 }, { x: 62, y: 190 }], [{ x: 36, y: 98 }, { x: 70, y: 98 }]];
+/** 고양이 옆에 쪼그려 앉는 거리(왼쪽, 오른쪽 한 명씩) */
+const PET_GAP = 14;
+/** 기다리는 사람이 앉은 채로 쓰다듬는 고양이 거리 */
+const PET_NEAR = 40;
+
+/** 자리 -> 발 위치(걸어서 닿는 곳, 집 좌표). 앉는 자리는 가구 앞, 침대는 침대 아래, 눕기는 러그 위 */
+export function footOf(pose, spot) {
+  if (pose === 'bed') return { x: spot.clip[0] + 8, y: spot.clip[1] + spot.clip[3] + 3 };
+  if (pose === 'lie') return { x: spot.x + 36, y: spot.y + 52 };
+  return { x: spot.x + 40, y: spot.y + 48 };
+}
+const spotAt = (foot) => ({ x: foot.x - 40, y: foot.y - 48 });
+
+/**
+ * 발 위치 두 곳 사이 걷는 길(점들). 다른 방이면 문 구멍 지점을 차례로 거친다(고양이와 같은 길 찾기).
+ * 걷다가 문 구멍 안(어느 방도 아닌 곳)에서 새 자리로 바뀌면, 그 문의 양쪽 지점 중 목적지까지 문을 덜 거치는 쪽으로 먼저 나간다
+ * (처음에는 방을 몰라 문을 거치지 않고 곧장 가서 벽을 지났다, codex P2 11-27)
+ */
+export function walkRoute(from, to) {
+  const goal = roomAt(to.x, to.y);
+  const here = roomAt(from.x, from.y);
+  // 방 안이어도 바닥이 아니면(작업실-거실 문처럼 벽지를 뚫은 문 구멍 안) 문 구멍에 있는 것으로 본다
+  if (here && inRect(FLOORS[here], from.x, from.y)) return [from, ...roomRoute(here, goal), to];
+  const door = DOORS.find((d) => inRect(d.gap, from.x, from.y));
+  if (!door) return [from, to];
+  const exits = [door.a, door.b].map((p) => ({ p, rest: roomRoute(roomAt(p.x, p.y), goal) }));
+  const best = exits.reduce((m, e) => (e.rest.length < m.rest.length ? e : m));
+  return [from, best.p, ...best.rest, to];
+}
+
+const pathLength = (path) => path.slice(1).reduce((s, p, i) => s + Math.hypot(p.x - path[i].x, p.y - path[i].y), 0);
+
+/** 걷기 시작: t0 에 from 을 떠나 to 로. 걸리는 시간은 초당 24도트, 최대 8초 */
+export function startWalk(from, to, t0) {
+  const path = walkRoute(from, to);
+  const length = pathLength(path);
+  return { path, length, t0, ms: Math.min((length / WALK_SPEED) * 1000, WALK_MAX_MS) };
+}
+
+const dirOf = (from, to) => {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (Math.abs(dx) >= Math.abs(dy)) return dx < 0 ? 'left' : 'right';
+  return dy < 0 ? 'up' : 'down';
+};
+
+/** 걷기 w 의 시각 t 위치 { x, y, dir(down, up, left, right), done } */
+export function walkAt(w, t) {
+  const last = w.path[w.path.length - 1];
+  if (t >= w.t0 + w.ms) return { x: last.x, y: last.y, dir: dirOf(w.path[w.path.length - 2] ?? last, last), done: true };
+  const p = w.ms > 0 ? Math.max(0, (t - w.t0) / w.ms) : 1;
+  const at = alongPath(w.path, w.length * p);
+  return { x: at.x, y: at.y, dir: dirOf(at.from, at.to), done: false };
+}
+
+/**
+ * 목록을 새로 받았을 때 걷기 고르기. drawn 은 화면이 마지막으로 그린 세션마다의 발 위치, prev 는 바로 앞 배치.
+ * 정해진 자리가 바뀐 세션만 그린 위치에서 새 자리로 걷기 시작한다. 자리가 그대로면(목록을 10초마다 다시 받을 때 대부분)
+ * 하던 걷기나 할 일을 그대로 둔다(처음에는 그린 위치와 자리를 비교해서, 할 일 하러 나가 있는 사람을 10초마다 집으로 돌려보냈다, codex P2 11-27).
+ * 처음 보는 세션(그린 적 없음)은 걷지 않고 바로 나타난다(사용자 확인: 새로고침하면 바로 나타나도 괜찮다).
+ * 다 걸은 걷기도 잠시 남겨 둔다. sceneAt 이 도착 시각보다 먼저 시작한 할 일을 건너뛰게 하려고(도착하자마자 할 일 한가운데로 튀지 않게)
+ */
+export function updateWalks(walks, drawn, layout, now, prev = null) {
+  // 지금 이 순간 예전 배치로 그렸을 발 위치(없으면 화면이 마지막으로 그린 위치)
+  const was = prev ? sceneAt(prev, now, { walks }).feet : new Map(drawn ?? []);
+  // 정해진 자리가 그대로인 세션은 하던 걷기를 이어 간다
+  const kept = new Map();
+  for (const a of layout?.actors ?? []) {
+    const old = walks?.get(a.id);
+    if (!old || now >= old.t0 + old.ms + 2 * ACT_BLOCK_MS) continue;
+    const end = old.path[old.path.length - 1];
+    const target = footOf(a.pose, a.spot);
+    if (end.x === target.x && end.y === target.y) kept.set(a.id, old);
+  }
+  // 새 배치로 지금 그릴 발 위치가 예전과 다르면(자리가 바뀜, 같은 의자에서 상태만 바뀜, 대화 상대가 떠남 등) 예전 위치에서 제자리로 걷는다.
+  // 길이 0 인 걷기도 남긴다. 도착 시각(지금)보다 먼저 시작한 할 일을 건너뛰게 해서 할 일 한가운데로 튀지 않게 한다(codex P2 11-27)
+  const now2 = sceneAt(layout, now, { walks: kept }).feet;
+  const next = new Map(kept);
+  for (const a of layout?.actors ?? []) {
+    const from = was.get(a.id);
+    if (!from) continue; // 처음 보는 세션은 바로 나타난다
+    const to = now2.get(a.id);
+    if (Math.hypot(from.x - to.x, from.y - to.y) <= 1) continue;
+    next.set(a.id, startWalk(from, footOf(a.pose, a.spot), now));
+  }
+  return next;
+}
+
+/** 세션 번호 -> 할 일 간격(구간 2~4개 = 1~2분)과 시작 칸 */
+function actEvery(id) {
+  const h = hashId(`act:${id}`);
+  const every = 2 + (h % 3);
+  return { every, phase: Math.floor(h / 3) % every };
+}
+const actOn = (id, k) => {
+  const { every, phase } = actEvery(id);
+  return (((k + phase) % every) + every) % every === 0;
+};
+
+/**
+ * 구간 k 에서 끝난 사람들이 할 일(세션 번호 -> { kind, foot, pose, spot, dir, with }).
+ * 대화는 둘씩 짝(남으면 쉬기), 먹기는 아무도 앉지 않은 식탁 자리, 쓰다듬기는 그 구간 고양이 놀 자리 양옆 두 명까지
+ */
+function blockPlan(layout, k, withCat = true) {
+  const plan = new Map();
+  const done = (layout?.actors ?? []).filter((a) => a.kind === 'done' && actOn(a.id, k));
+  const kinds = done.map((a) => ['eat', 'pet', 'talk'][hashId(`kind:${a.id}:${k}`) % 3]);
+  const talkers = done.filter((_, i) => kinds[i] === 'talk');
+  for (let i = 0; i + 1 < talkers.length && i / 2 < TALK_SPOTS.length; i += 2) {
+    const [l, r] = TALK_SPOTS[i / 2];
+    plan.set(talkers[i].id, { kind: 'talk', foot: l, pose: 'face', dir: 'right', with: talkers[i + 1].id });
+    plan.set(talkers[i + 1].id, { kind: 'talk', foot: r, pose: 'face', dir: 'left', with: talkers[i].id });
+  }
+  const taken = new Set((layout?.actors ?? []).map((a) => a.spot));
+  const tables = REST.filter((r) => (r.pose === 'eat' || r.pose === 'drink') && !taken.has(r.spot));
+  done.filter((_, i) => kinds[i] === 'eat').forEach((a) => {
+    const seat = tables.shift();
+    if (seat) plan.set(a.id, { kind: 'eat', foot: footOf(seat.pose, seat.spot), pose: seat.pose, spot: seat.spot });
+  });
+  const cat = CAT_SPOTS[catSpot(k)];
+  const sides = withCat
+    ? [-PET_GAP, PET_GAP].map((dx) => ({ x: cat.x + dx, y: cat.y })).filter((f) => onWalkway(f.x, f.y) && roomAt(f.x, f.y) === roomAt(cat.x, cat.y))
+    : [];
+  done.filter((_, i) => kinds[i] === 'pet').forEach((a) => {
+    const foot = sides.shift();
+    if (foot) plan.set(a.id, { kind: 'pet', foot, pose: 'crouch' });
+  });
+  return plan;
+}
+
+/**
+ * 끝난 사람 a 의 시각 t 할 일 모습. 하지 않을 때는 null.
+ * since: 상태가 바뀌어 지금 자리에 걸어 도착한 시각. 그보다 먼저 집을 나섰어야 하는 할 일은 건너뛴다
+ * (처음에는 도착하자마자 이미 시작한 할 일 한가운데로 튀었다, codex P2 11-27)
+ */
+function activityView(a, t, plans, sinceOf = () => -Infinity) {
+  const k = Math.floor(t / ACT_BLOCK_MS);
+  for (const kk of [k, k - 1]) {
+    const plan = plans(kk).get(a.id);
+    if (!plan) continue;
+    const t0 = kk * ACT_BLOCK_MS;
+    // 집을 나서는 가장 이른 때(구간 시작 + 18초 - 최대 8초 걷기)보다 늦게 도착했으면 이 구간 할 일은 건너뛴다.
+    // 대화는 짝도 같은 기준으로 본다. 한 사람만 건너뛰어 혼자 대화하는 일이 없게(codex P2 11-27)
+    const earliest = t0 + ACT_ARRIVE_MS - WALK_MAX_MS;
+    if (sinceOf(a.id) > earliest || (plan.with && sinceOf(plan.with) > earliest)) continue;
+    const home = footOf(a.pose, a.spot);
+    const outMs = startWalk(home, plan.foot, 0).ms;
+    const out = startWalk(home, plan.foot, t0 + ACT_ARRIVE_MS - outMs);
+    const back = startWalk(plan.foot, home, t0 + ACT_END_MS);
+    const activity = { kind: plan.kind, k: kk, with: plan.with ?? null };
+    if (t < out.t0) continue;
+    if (t < t0 + ACT_ARRIVE_MS) {
+      const w = walkAt(out, t);
+      return { pose: 'walk', dir: w.dir, spot: spotAt(w), mood: null, activity: { ...activity, phase: 'go' } };
+    }
+    if (t < t0 + ACT_END_MS) {
+      const mood = plan.kind === 'pet' ? 'heart' : plan.kind === 'talk' ? 'talk' : null;
+      return { pose: plan.pose, dir: plan.dir ?? 'down', spot: plan.spot ?? spotAt(plan.foot), mood, activity: { ...activity, phase: 'do' } };
+    }
+    if (t < back.t0 + back.ms) {
+      const w = walkAt(back, t);
+      return { pose: 'walk', dir: w.dir, spot: spotAt(w), mood: null, activity: { ...activity, phase: 'back' } };
+    }
+  }
+  return null;
+}
+
+/** 기다리는 사람(앉은 채)의 할 일 꼬리표: 옆자리 기다림과 대화("..."), 고양이가 가까우면 하트 */
+function waitMood(a, layout, t, cat) {
+  const k = Math.floor(t / ACT_BLOCK_MS);
+  const into = t - k * ACT_BLOCK_MS;
+  const pair = WAIT_PAIRS.find((p) => p.includes(a.spot));
+  if (pair && into >= ACT_ARRIVE_MS && into < ACT_END_MS) {
+    const other = (layout?.actors ?? []).find((o) => o !== a && o.kind !== 'done' && o.kind !== 'working' && pair.includes(o.spot));
+    if (other && actOn([a.id, other.id].sort().join('+'), k)) return 'talk';
+  }
+  const foot = footOf(a.pose, a.spot);
+  if (cat && Math.hypot(cat.x - foot.x, cat.y - foot.y) <= PET_NEAR) return 'heart';
+  return null;
+}
+
+/**
+ * 시각 t 에 그릴 사람들. layout 은 목록으로 정한 자리, walks 는 updateWalks 결과(상태가 바뀌어 걷는 중인 세션).
+ * 돌려주는 사람마다 pose(walk, crouch, face 포함), spot(그릴 자리 칸), dir, bubble, mood(heart, talk), activity.
+ * 걷는 동안 끝남의 Zz 는 감추고, 기다림의 ! ? 는 늘 보인다(사용자 결정). 동작 줄이기면 자리 그대로.
+ * feet 는 세션마다 그린 발 위치(다음 updateWalks 에 넘긴다)
+ */
+export function sceneAt(layout, t, { walks = null, reduced = false, cat } = {}) {
+  const base = layout?.actors ?? [];
+  if (reduced) {
+    const actors = base.map((a) => ({ ...a, dir: 'down', mood: null, activity: null }));
+    return { actors, overflow: layout?.overflow ?? 0, feet: new Map(actors.map((a) => [a.id, footOf(a.pose, a.spot)])) };
+  }
+  // cat 을 안 넘기면 시각으로 계산한 고양이, null 이면 고양이 그림이 없다는 뜻이라 쓰다듬기를 하지 않는다(codex P3 11-27)
+  const catNow = cat === undefined ? catAt(t) : cat;
+  const cache = new Map();
+  const plans = (kk) => {
+    if (!cache.has(kk)) cache.set(kk, blockPlan(layout, kk, !!catNow));
+    return cache.get(kk);
+  };
+  const sinceOf = (id) => {
+    const w = walks?.get(id);
+    return w ? w.t0 + w.ms : -Infinity;
+  };
+  const actors = base.map((a) => {
+    const w = walks?.get(a.id);
+    if (w && t < w.t0 + w.ms) {
+      const at = walkAt(w, t);
+      return { ...a, pose: 'walk', dir: at.dir, spot: spotAt(at), bubble: a.kind === 'done' ? null : a.bubble, mood: null, activity: null };
+    }
+    if (a.kind === 'done') {
+      const v = activityView(a, t, plans, sinceOf);
+      if (v) return { ...a, ...v, bubble: null };
+    } else if (a.kind !== 'working' && a.pose === 'armchair') {
+      return { ...a, dir: 'down', mood: waitMood(a, layout, t, catNow), activity: null };
+    }
+    return { ...a, dir: 'down', mood: null, activity: null };
+  });
+  return { actors, overflow: layout?.overflow ?? 0, feet: new Map(actors.map((a) => [a.id, footOf(a.pose, a.spot)])) };
 }

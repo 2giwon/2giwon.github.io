@@ -14,7 +14,7 @@ import {
 } from '../sessions.mjs';
 import {
   ART_FOLDER, HOUSE, CHAIR, layoutRoom, frameCell, animFrame, loadRoomArt, labelBoxes, labelScale,
-  CAT_CELL, catAt, pickAt, depthOf, PCELL, PERSON_AT, frameXY,
+  CAT_CELL, catAt, pickAt, depthOf, PCELL, PERSON_AT, frameXY, sceneAt, updateWalks,
 } from '../session-room.mjs';
 
 /** 침대에 쓸 눕기 그림 부분(Memao 칸 안 x, y, 너비, 높이). 높이 16 이 돌린 뒤 침대 폭(16)이 된다 */
@@ -51,9 +51,10 @@ function drawCat(x, img, cat) {
 
 /**
  * 집 한 장면을 그린다. 집 배경(가구까지 들어 있다), 사람과 고양이(앞뒤 순서대로), 번호, 말풍선 순서.
- * k 는 번호와 말풍선 배율(labelScale, 폰처럼 캔버스가 작게 보이면 커진다)
+ * layout 은 sceneAt 결과(걷는 사람, 할 일 하는 사람 포함). k 는 번호와 말풍선 배율(labelScale, 폰처럼 캔버스가 작게 보이면 커진다).
+ * frame 은 0.5초마다, step 은 0.125초마다 하나씩 는다(걷기는 step 으로 빨리 넘긴다)
  */
-function drawRoom(canvas, art, layout, frame, cat, k) {
+function drawRoom(canvas, art, layout, frame, cat, k, step = frame) {
   const x = canvas.getContext?.('2d');
   if (!x) return;
   const S = SCALE;
@@ -68,7 +69,7 @@ function drawRoom(canvas, art, layout, frame, cat, k) {
   for (const item of scene) {
     if (item.cat) { drawCat(x, art.cat, item.cat); continue; }
     const { a } = item;
-    const { frame: f, dy = 0, turn } = frameCell(a.pose, frame);
+    const { frame: f, dy = 0, turn } = frameCell(a.pose, a.pose === 'walk' ? step : frame, a.dir);
     const sheet = art.people[a.look];
     const { sx, sy } = frameXY(f);
     if (turn) {
@@ -117,6 +118,16 @@ function drawRoom(canvas, art, layout, frame, cat, k) {
     x.fillRect(bx, by, bw * S, bh * S);
     x.fillStyle = a.bubble === '!' ? '#e0661b' : a.bubble === '?' ? '#2f6fd6' : '#3a3f6b';
     x.fillText(a.bubble === 'z' ? 'Zz' : a.bubble, bx + (bw / 2) * S, by + (bh / 2) * S);
+  }
+  // 할 일 꼬리표(번호 왼쪽): 쓰다듬기 하트, 대화 "..."(점이 하나씩 늘어난다)
+  for (const a of actors) {
+    if (!a.mood) continue;
+    const { mood } = labelBoxes(a, k);
+    const mw = mood.r - mood.l, mh = mood.b - mood.t;
+    x.fillStyle = a.mood === 'heart' ? 'rgba(255,214,226,.95)' : 'rgba(255,255,255,.95)';
+    x.fillRect(mood.l * S, mood.t * S, mw * S, mh * S);
+    x.fillStyle = a.mood === 'heart' ? '#e0306a' : '#3a3f6b';
+    x.fillText(a.mood === 'heart' ? '♥' : '.'.repeat(1 + (step % 3)), (mood.l + mw / 2) * S, (mood.t + mh / 2) * S);
   }
   for (const a of actors) {
     const { label } = labelBoxes(a, k);
@@ -171,6 +182,11 @@ export function sessionsCard({
   let loading = false;
   let art = { state: 'loading' };
   let layout = { actors: [], overflow: 0 };
+  // 걸어가기(11-27): 세션마다 마지막으로 그린 발 위치와 걷는 중인 길. 목록을 새로 받아 자리가 바뀌면 그린 위치에서 새 자리로 걷는다
+  let drawnFeet = new Map();
+  let walks = new Map();
+  let scene = { actors: [], overflow: 0 }; // 지금 그린 장면(걷는 사람 포함). 누르기 판정도 이것으로 한다
+  const sceneNow = () => sceneAt(layout, Date.now(), { walks, reduced: still(), cat: art.images?.cat ? currentCat() : null });
   let showRoom = false;
   let shownRows = []; // 지금 목록(방 번호 n = 순서 + 1)
 
@@ -186,7 +202,8 @@ export function sessionsCard({
   let pokedAt = null;
   const currentCat = () => catAt(Date.now(), { reduced: still(), pokedAt });
   canvas.addEventListener('click', (e) => {
-    const pick = pickAt(layout, art.images?.cat ? currentCat() : null, ...roomPoint(e), labelK());
+    // 걷는 사람도 화면에 보이는 자리에서 누를 수 있게 마지막으로 그린 장면으로 판정한다(새로 계산하면 0.125초 사이 앞서 나갔다, codex P2 11-27)
+    const pick = pickAt(scene, art.images?.cat ? currentCat() : null, ...roomPoint(e), labelK());
     if (pick?.cat) {
       if (!still()) { pokedAt = Date.now(); paintRoom(); }
       return;
@@ -208,7 +225,7 @@ export function sessionsCard({
   });
   canvas.addEventListener('mousemove', (e) => {
     // 동작 줄이기면 고양이는 눌러도 반응하지 않아서 손가락 모양을 보이지 않는다(리뷰 P3)
-    const pick = pickAt(layout, art.images?.cat ? currentCat() : null, ...roomPoint(e), labelK());
+    const pick = pickAt(scene, art.images?.cat ? currentCat() : null, ...roomPoint(e), labelK());
     canvas.style.cursor = pick?.actor || (pick?.cat && !still()) ? 'pointer' : '';
   });
 
@@ -233,7 +250,9 @@ export function sessionsCard({
       roomBox.classList.remove('loading');
       roomBox.replaceChildren(canvas);
     }
-    drawRoom(canvas, art.images, layout, animFrame(Math.floor(tick / PEOPLE_EVERY), still()), currentCat(), labelK());
+    scene = sceneNow();
+    drawnFeet = scene.feet;
+    drawRoom(canvas, art.images, scene, animFrame(Math.floor(tick / PEOPLE_EVERY), still()), currentCat(), labelK(), animFrame(tick, still()));
   }
 
   function paint(result) {
@@ -242,7 +261,11 @@ export function sessionsCard({
     status.textContent = '';
     card.classList.toggle('stale', !!view.stale);
     showRoom = view.state === 'list' || view.state === 'empty' || (view.state === 'failed' && !!last);
-    layout = view.state === 'list' ? layoutRoom(view.rows) : view.state === 'empty' ? layoutRoom([]) : layout;
+    const nextLayout = view.state === 'list' ? layoutRoom(view.rows) : view.state === 'empty' ? layoutRoom([]) : layout;
+    // 자리가 바뀐 세션은 마지막으로 그린 발 위치에서 새 자리로 걷는다(목록은 10초마다 읽어서 최대 10초 늦게 출발, 사용자 확인)
+    // 자리가 그대로인 세션은 하던 걷기나 할 일을 이어 간다(바로 앞 배치 layout 과 비교, codex P2 11-27)
+    if (nextLayout !== layout) walks = updateWalks(walks, drawnFeet, nextLayout, Date.now(), layout);
+    layout = nextLayout;
     if (view.state === 'list') shownRows = view.rows;
     else if (view.state === 'empty') shownRows = [];
     paintRoom();

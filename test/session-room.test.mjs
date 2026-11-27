@@ -2,8 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   layoutRoom, frameCell, lookFor, PEOPLE, restFor, headAt, bodyBox, animFrame, loadRoomArt, actorAt, ROOM_MAX, SEATS, WORK_STANDS,
-  DOOR_STANDS, DOZE_STANDS, REST, ROOMS, FLOORS, DOORS, roomAt, onWalkway, HOUSE, ARMCHAIR, SOFA, FRONT_PARTS, TABLE, FRAMES,
+  WAIT_SEATS, WAIT_STANDS, DOZE_STANDS, REST, ROOMS, FLOORS, DOORS, roomAt, onWalkway, HOUSE, ARMCHAIR, SOFA, FRONT_PARTS, TABLE, FRAMES,
   CAT_ACTS, CAT_SPOTS, catAt, pickAt, depthOf, labelScale, labelBoxes,
+  footOf, walkRoute, startWalk, walkAt, updateWalks, sceneAt, ACT_BLOCK_MS,
 } from '../app/session-room.mjs';
 
 // 세션 카드 "세션 집" 장면(11-27). 방 하나짜리 장면을 다섯 방짜리 집으로 넓혔다(계획 2026-11-27-session-house-plan.md).
@@ -30,11 +31,12 @@ test('H0. 집은 384x224, 방 다섯(위: 침실, 작업실, 식당 / 아래: �
   assert.equal(roomAt(121, 50), null, '벽 위');
 });
 
-// H1: 사용자 결정 "일하는 중 = 작업실, 답 기다림과 확인 필요 = 현관(문 앞에서 사용자를 기다림), 끝남 = 거실, 침실, 식당"
-test('H1. 상태마다 방: 일하는 중은 작업실, 답 기다림과 확인 필요는 현관, 끝남은 거실, 침실, 식당', () => {
+// H1: 사용자 결정 "일하는 중 = 작업실, 끝남 = 거실, 침실, 식당". 답 기다림과 확인 필요는 처음에 현관이었는데
+// 11-27 사용자가 "대답 기다릴 때 현관에 서 있도록 하지 말고 거실로 와서 의자에 앉아서 대기"로 바꿨다(W1)
+test('H1. 상태마다 방: 일하는 중은 작업실, 답 기다림과 확인 필요는 거실, 끝남은 거실, 침실, 식당', () => {
   const { actors } = layoutRoom(rows('working', 'waiting', 'review', 'done', 'working', 'done', 'done', 'waiting', 'done', 'review'));
   for (const a of actors) {
-    const want = { working: ['work'], waiting: ['entrance'], review: ['entrance'], done: ['living', 'bedroom', 'dining'] }[a.kind];
+    const want = { working: ['work'], waiting: ['living'], review: ['living'], done: ['living', 'bedroom', 'dining'] }[a.kind];
     assert.ok(want.includes(roomOf(a)), `${a.n} ${a.kind} 가 ${roomOf(a)} 에 있다`);
   }
   // 일하는 중은 책상 넷에 먼저 앉고, 다섯째부터는 작업실에 선다
@@ -43,10 +45,11 @@ test('H1. 상태마다 방: 일하는 중은 작업실, 답 기다림과 확인 
   assert.ok(work.slice(0, 4).every((a) => a.pose === 'sit'));
   assert.deepEqual(work.slice(4).map((a) => a.spot), WORK_STANDS);
   assert.ok(work.slice(4).every((a) => a.pose === 'stand' && a.bubble === null));
-  // 답 기다림 "!", 확인 필요 "?" 는 현관 서는 자리
+  // 답 기다림 "!", 확인 필요 "?" 는 거실 의자
   const [w, r] = layoutRoom(rows('waiting', 'review')).actors;
   assert.equal(w.bubble, '!'); assert.equal(r.bubble, '?');
-  assert.ok(DOOR_STANDS.includes(w.spot) && DOOR_STANDS.includes(r.spot) && w.spot !== r.spot);
+  assert.ok(WAIT_SEATS.includes(w.spot) && WAIT_SEATS.includes(r.spot) && w.spot !== r.spot);
+  assert.equal(w.pose, 'armchair');
   // 끝남은 모두 "Zz"
   assert.ok(layoutRoom(rows('done', 'done', 'done')).actors.every((a) => a.bubble === 'z' && REST.some((s) => s.spot === a.spot)));
 });
@@ -104,10 +107,11 @@ test('H2. 10명이면 10명 모두 서로 다른 캐릭터, 11명째부터 넘�
   assert.equal(actors.length, 10);
   assert.equal(overflow, 2);
   assert.deepEqual(actors.map((a) => a.n), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-  // 현관 서는 자리(6)보다 답 기다림이 많으면 자리를 못 받은 사람도 넘친 수로 센다
+  // 거실 의자(4)와 거실 서기(2)보다 답 기다림이 많으면 자리를 못 받은 사람도 넘친 수로 센다
   const crowd = layoutRoom(rows(...Array(8).fill('waiting')));
-  assert.equal(crowd.actors.length, DOOR_STANDS.length);
-  assert.equal(crowd.overflow, 8 - DOOR_STANDS.length);
+  const waitRoom = WAIT_SEATS.length + WAIT_STANDS.length;
+  assert.equal(crowd.actors.length, waitRoom);
+  assert.equal(crowd.overflow, 8 - waitRoom);
   assert.deepEqual(layoutRoom([]), { actors: [], overflow: 0 });
 });
 
@@ -117,7 +121,7 @@ const overlaps = (a, b) => a.l + TOUCH < b.r && b.l + TOUCH < a.r && a.t + TOUCH
 const ALL_SPOTS = [
   ...SEATS.map((s) => ({ name: `책상 ${s.x}`, pose: 'sit', spot: s })),
   ...WORK_STANDS.map((s) => ({ name: `작업실 서기 ${s.x}`, pose: 'stand', spot: s })),
-  ...DOOR_STANDS.map((s) => ({ name: `현관 서기 ${s.x},${s.y}`, pose: 'stand', spot: s })),
+  ...WAIT_STANDS.map((s) => ({ name: `거실 기다림 서기 ${s.x},${s.y}`, pose: 'stand', spot: s })),
   ...DOZE_STANDS.map((s) => ({ name: `거실 졸기 ${s.x}`, pose: 'doze', spot: s })),
   ...REST.map((r, i) => ({ name: `쉬기 ${i} ${r.pose}`, pose: r.pose, spot: r.spot })),
 ];
@@ -202,7 +206,11 @@ test('R10. 책상 의자마다 덧그릴 의자 자리가 있고, 사람 가운�
 
 // H6: 식당 먹기, 마시기 칸(그림판을 크게 그려 확인. 200~202 앞모습 주먹밥 들고 한 입, 268~271 앞모습 컵을 입에)
 test('H6. 동작과 프레임 -> Memao 칸 번호(먹기 200~202, 마시기 268~271 포함)', () => {
-  assert.deepEqual(FRAMES, { front: 0, back: 4, lie: 190, eat: [200, 201, 202, 201], drink: [268, 269, 270, 271] });
+  // 11-27 생활 계획에서 걷기, 대화(옆모습), 쓰다듬기(쪼그려 앉기) 칸이 더해졌다(W3, W6)
+  assert.deepEqual(FRAMES, {
+    front: 0, back: 4, lie: 190, eat: [200, 201, 202, 201], drink: [268, 269, 270, 271],
+    walk: { down: 16, up: 22, left: 28, right: 34 }, face: { left: 8, right: 12 }, crouch: [180, 181],
+  });
   assert.deepEqual(frameCell('eat', 0), { frame: 200 });
   assert.deepEqual(frameCell('eat', 1), { frame: 201 });
   assert.deepEqual(frameCell('eat', 3), { frame: 201 });
@@ -274,16 +282,18 @@ test('H5. 번호와 말풍선 크기: 캔버스가 좁을수록 커지고, 누�
   assert.equal(actorAt(layout, ...edge, 2.2)?.n, 1);
   const bubble = labelBoxes(a, 2.2).bubble;
   assert.equal(actorAt(layout, bubble.r - 0.5, bubble.t + 0.5, 2.2)?.n, 1);
-  // k=1 은 번호 반지름 4도트(예전 크기). 말풍선은 번호 동그라미 오른쪽 위에 붙은 8x7 꼬리표
+  // k=1 은 번호 반지름 4도트(예전 크기). 말풍선은 번호 동그라미 바로 위에 붙은 8x7 꼬리표(11-27 오른쪽 위에서 위로 옮김, H5-3)
   const one = labelBoxes(a, 1);
   const h = headAt(a);
   assert.deepEqual([one.label.cx, one.label.cy, one.label.r], [h.x, h.y - 5, 4]);
-  assert.deepEqual(one.bubble, { l: h.x, r: h.x + 8, t: h.y - 12.5, b: h.y - 5.5 });
+  assert.deepEqual(one.bubble, { l: h.x - 4, r: h.x + 4, t: h.y - 15, b: h.y - 8 });
 });
 
 // 11-27 확인 페이지 폰 폭 캡처: 현관 자리는 30도트 간격인데, 처음에는 말풍선을 번호 오른쪽에 10x10 으로 두고 배율만큼 키워서
 // 1번, 2번의 "!" 가 옆 사람 번호에 가려 안 보였다. 답 기다림 "!", 확인 필요 "?" 는 꼭 보여야 해서 번호 오른쪽 위 꼬리표로 바꿨다
-test('H5-3. 현관에 여섯 명이 서도 폰 폭까지 "!", "?" 글자가 다른 사람 번호에 가리지 않는다', () => {
+// 11-27 기다림이 거실 의자로 옮겼다. 소파와 안락의자는 16~22도트 간격이라 꼬리표를 번호 오른쪽 위에 두면 320px 폰에서
+// 옆 사람 번호에 가렸다. 그래서 꼬리표를 번호 바로 위에 둔다(옆 사람은 옆에 있어서 위아래로 쌓으면 겹치지 않는다)
+test('H5-3. 거실에 기다리는 여섯 명이 있어도 폰 폭까지 "!", "?" 글자가 다른 사람 번호에 가리지 않는다', () => {
   const crowd = layoutRoom(rows('waiting', 'review', 'waiting', 'review', 'waiting', 'review'));
   assert.equal(crowd.actors.length, 6);
   for (const k of [1, labelScale(375), labelScale(312), labelScale(280)]) {
@@ -302,19 +312,18 @@ test('H5-3. 현관에 여섯 명이 서도 폰 폭까지 "!", "?" 글자가 다�
 
 // 소파 두 자리는 16도트 간격이라 폰에서는 번호와 말풍선이 겹친다.
 // 화면은 번호를 말풍선보다 나중에 그리고, 누르기도 번호를 말풍선보다 먼저 본다
-test('H5-2. 옆 사람 말풍선이 번호를 덮어도 번호를 누르면 번호 주인', () => {
+test('H5-2. 소파 옆자리 번호끼리 겹쳐도 번호와 꼬리표를 누르면 그 주인', () => {
   const sofa = REST.filter((r) => r.pose === 'armchair' && r.spot.front.src === SOFA);
   const [left, right] = sofa.sort((a, b) => a.spot.x - b.spot.x)
     .map((r, i) => ({ n: i + 1, kind: 'done', pose: r.pose, spot: r.spot, bubble: 'z' }));
   // 오른쪽 사람을 먼저 두어 앞뒤(같은 높이면 나중 사람) 고르기에 기대지 않는다
   const layout = { actors: [right, left], overflow: 0 };
+  // 폰 배율에서는 두 번호 동그라미끼리 겹친다. 오른쪽 번호의 오른쪽 끝을 누르면 오른쪽 사람, 꼬리표를 누르면 그 꼬리표 주인
   for (const k of [2.2, 2.5]) {
     const { label } = labelBoxes(right, k);
-    const { bubble } = labelBoxes(left, k);
-    // 오른쪽 번호 동그라미의 왼쪽 위 부분: 왼쪽 사람 말풍선 꼬리표와 겹치는 곳
-    const point = [label.cx - label.r / 2, label.cy - label.r / 2];
-    assert.ok(point[0] >= bubble.l && point[0] <= bubble.r && point[1] >= bubble.t && point[1] <= bubble.b, `k ${k}: 말풍선이 번호를 덮는다`);
-    assert.equal(actorAt(layout, ...point, k)?.n, right.n, `k ${k}`);
+    assert.equal(actorAt(layout, label.cx + label.r / 2, label.cy, k)?.n, right.n, `k ${k}`);
+    const lb = labelBoxes(left, k).bubble;
+    assert.equal(actorAt(layout, (lb.l + lb.r) / 2, lb.t + 1, k)?.n, left.n, `k ${k} 꼬리표`);
   }
 });
 
@@ -469,10 +478,324 @@ test('C10. 그리는 순서(앞뒤): 침대에 누운 사람은 침실 고양이
   const bedroomCats = CAT_SPOTS.filter((s) => roomAt(s.x, s.y) === 'bedroom');
   assert.ok(bedroomCats.length > 0);
   for (const c of bedroomCats) assert.ok(depthOf({ pose: 'bed', spot: bed.spot }) < c.y);
-  assert.equal(depthOf({ pose: 'stand', spot: DOOR_STANDS[0] }), DOOR_STANDS[0].y + 48);
+  assert.equal(depthOf({ pose: 'stand', spot: WORK_STANDS[0] }), WORK_STANDS[0].y + 48);
+});
+
+// ---------------------------------------------------------------------------
+// 세션 집 생활(11-27 계획 2026-11-27-session-life-plan.md). 사용자: "일을 시키면 컴퓨터 방으로 걸어가서 작업, 끝나고 쉴 때는 방이나
+// 거실 소파로 이동, 대답 기다릴 때 거실 의자에 앉아서 대기, 쉬거나 대기일 때는 고양이를 만지거나 밥을 먹거나 대화"
+
+test('W1. 기다림과 확인 필요는 거실 의자에 먼저 앉고, 끝남은 남은 거실 의자만 쓴다. 넘치면 거실 서기, 그다음 넘친 수', () => {
+  assert.equal(WAIT_SEATS.length, 4);
+  for (const s of WAIT_SEATS) assert.ok(REST.some((r) => r.spot === s && r.pose === 'armchair'), '거실 의자는 쉬는 자리이기도 하다');
+  // 끝남이 목록 앞에 있어도 기다림이 거실 의자를 먼저 갖는다
+  const ids = WAIT_SEATS.map((s) => idsWithRest(REST.findIndex((r) => r.spot === s), 1)[0]);
+  const list = [...doneRows(ids), row('w0', 'waiting'), row('w1', 'review')];
+  const { actors } = layoutRoom(list);
+  const done = actors.filter((a) => a.kind === 'done');
+  const wait = actors.filter((a) => a.kind !== 'done');
+  assert.ok(wait.every((a) => WAIT_SEATS.includes(a.spot)));
+  assert.ok(done.every((a) => !wait.some((w) => w.spot === a.spot)), '같은 의자에 두 사람이 앉지 않는다');
+  assert.equal(done.filter((a) => WAIT_SEATS.includes(a.spot)).length, 2, '끝남은 남은 거실 의자 둘만');
+  assert.deepEqual(actors.map((a) => a.n), [1, 2, 3, 4, 5, 6], '번호는 목록 순서 그대로');
+  // 여섯 명까지 거실(의자 4, 서기 2)
+  const six = layoutRoom(rows(...Array(6).fill('waiting'))).actors;
+  assert.deepEqual(six.map((a) => a.spot), [...WAIT_SEATS, ...WAIT_STANDS]);
+  assert.ok(six.every((a) => roomOf(a) === 'living'));
+});
+
+const feetOf = () => [
+  ...SEATS.map((s) => footOf('sit', s)), ...WORK_STANDS.map((s) => footOf('stand', s)), ...WAIT_STANDS.map((s) => footOf('stand', s)),
+  ...DOZE_STANDS.map((s) => footOf('doze', s)), ...REST.map((r) => footOf(r.pose, r.spot)),
+];
+
+test('W2. 모든 자리의 발 위치가 바닥 위에 있고, 어느 자리에서 어느 자리로 가든 길이 바닥과 문 구멍 위로만 지난다', () => {
+  const feet = feetOf();
+  for (const f of feet) assert.ok(onWalkway(f.x, f.y) && roomAt(f.x, f.y), `발 ${f.x},${f.y}`);
+  for (const a of feet) {
+    for (const b of feet) {
+      const path = walkRoute(a, b);
+      assert.deepEqual(path[0], a); assert.deepEqual(path[path.length - 1], b);
+      for (let i = 1; i < path.length; i += 1) {
+        for (let s = 0; s <= 20; s += 1) {
+          const x = path[i - 1].x + ((path[i].x - path[i - 1].x) * s) / 20;
+          const y = path[i - 1].y + ((path[i].y - path[i - 1].y) * s) / 20;
+          assert.ok(onWalkway(x, y), `${a.x},${a.y} -> ${b.x},${b.y} 길이 벽 위(${x.toFixed(1)},${y.toFixed(1)})`);
+        }
+      }
+    }
+  }
+});
+
+test('W3. 걷기: 최대 8초, 가는 방향에 맞는 걷기 칸(앞 16, 뒤 22, 왼쪽 28, 오른쪽 34부터 6장), 도착하면 끝', () => {
+  assert.deepEqual(FRAMES.walk, { down: 16, up: 22, left: 28, right: 34 });
+  const from = footOf('sit', SEATS[0]);
+  const to = footOf(REST[0].pose, REST[0].spot); // 작업실 책상 -> 침실 침대
+  const w = startWalk(from, to, 1000);
+  assert.ok(w.ms > 0 && w.ms <= 8000);
+  assert.deepEqual(walkAt(w, 1000), { x: from.x, y: from.y, dir: walkAt(w, 1000).dir, done: false });
+  assert.equal(walkAt(w, 1000 + w.ms).done, true);
+  const end = walkAt(w, 1000 + w.ms + 5);
+  assert.deepEqual([end.x, end.y, end.done], [to.x, to.y, true]);
+  // 왼쪽으로만 가는 길은 left, 오른쪽은 right, 아래 down, 위 up
+  const flat = (a, b) => walkAt(startWalk(a, b, 0), 10).dir;
+  assert.equal(flat({ x: 200, y: 200 }, { x: 150, y: 200 }), 'left');
+  assert.equal(flat({ x: 150, y: 200 }, { x: 200, y: 200 }), 'right');
+  assert.equal(flat({ x: 300, y: 160 }, { x: 300, y: 210 }), 'down');
+  assert.equal(flat({ x: 300, y: 210 }, { x: 300, y: 160 }), 'up');
+  assert.deepEqual(frameCell('walk', 7, 'left'), { frame: 29 });
+  assert.deepEqual(frameCell('walk', 0, 'right'), { frame: 34 });
+  assert.deepEqual(frameCell('walk', 5, 'down'), { frame: 21 });
+  assert.deepEqual(frameCell('walk', 2, 'up'), { frame: 24 });
+  // 상태가 바뀌면(작업실 -> 쉬는 자리) 예전에 그린 발 위치에서 새 자리로 걷기 시작. 처음 보는 세션은 바로 나타난다
+  const working = layoutRoom([row('m1', 'working')]);
+  const drawn = new Map([['local_m1', footOf('sit', working.actors[0].spot)]]);
+  const resting = layoutRoom([row('m1', 'done'), row('m2', 'done')]);
+  const walks = updateWalks(new Map(), drawn, resting, 5000);
+  assert.ok(walks.has('local_m1'));
+  assert.ok(!walks.has('local_m2'), '처음 보는 세션은 걷지 않는다');
+  const scene = sceneAt(resting, 5500, { walks });
+  const m1 = scene.actors.find((a) => a.id === 'local_m1');
+  assert.equal(m1.pose, 'walk');
+  assert.equal(m1.bubble, null, '걷는 동안 끝남의 Zz 는 감춘다');
+  // 기다림은 걸어가는 동안에도 ! 를 보인다(사용자 결정 3)
+  const waitL = layoutRoom([row('m1', 'waiting')]);
+  const s2 = sceneAt(waitL, 5500, { walks: updateWalks(new Map(), drawn, waitL, 5000) });
+  assert.equal(s2.actors[0].pose, 'walk');
+  assert.equal(s2.actors[0].bubble, '!');
+});
+
+// 끝남 한 명이 1시간 동안 하는 일. 30초 구간마다 본다
+const ACT_HOUR = (layout, id) => {
+  const seen = [];
+  for (let t = T0; t < T0 + 3600 * 1000; t += 1000) {
+    const a = sceneAt(layout, t, {}).actors.find((x) => x.id === id);
+    if (a.activity && a.activity.phase === 'do' && seen[seen.length - 1]?.k !== a.activity.k) seen.push({ k: a.activity.k, kind: a.activity.kind });
+  }
+  return seen;
+};
+
+test('W4. 끝남의 할 일은 세션 번호와 시각으로 늘 같고, 1~2분마다 한 번 이하로 한다', () => {
+  const layout = layoutRoom(rows('done', 'done', 'done'));
+  for (const a of layout.actors) {
+    const hour = ACT_HOUR(layout, a.id);
+    assert.ok(hour.length >= 15 && hour.length <= 60, `${a.id}: 한 시간에 ${hour.length}번`);
+    for (let i = 1; i < hour.length; i += 1) assert.ok(hour[i].k - hour[i - 1].k >= 2, '연달아 하지 않는다(1분 넘게 간격)');
+    assert.ok(new Set(hour.map((x) => x.kind)).size >= 2, '여러 가지를 한다');
+  }
+  assert.deepEqual(sceneAt(layout, T0 + 123456, {}), sceneAt(layout, T0 + 123456, {}));
+  // 동작 줄이기면 할 일과 걷기 없이 자리 그대로
+  const still = sceneAt(layout, T0 + 123456, { reduced: true });
+  assert.ok(still.actors.every((a, i) => a.spot === layout.actors[i].spot && !a.activity));
+});
+
+test('W5. 기다리는 세션은 자리를 떠나지 않고(앉은 채 대화, 쓰다듬기만) ! ? 를 늘 보인다', () => {
+  const layout = layoutRoom(rows('waiting', 'review', 'waiting', 'done', 'done'));
+  let talk = 0;
+  for (let t = T0; t < T0 + 1800 * 1000; t += 2000) {
+    for (const a of sceneAt(layout, t, {}).actors.filter((x) => x.kind !== 'done')) {
+      const base = layout.actors.find((x) => x.id === a.id);
+      assert.equal(a.spot, base.spot);
+      assert.equal(a.pose, 'armchair');
+      assert.ok(a.bubble === '!' || a.bubble === '?');
+      if (a.mood === 'talk') talk += 1;
+      assert.ok([null, 'talk', 'heart'].includes(a.mood ?? null));
+    }
+  }
+  assert.ok(talk > 0, '옆자리 기다리는 사람과 가끔 대화한다');
+});
+
+test('W6. 쓰다듬기는 고양이 옆에서 쪼그려 앉기(180~181)와 하트, 대화는 둘이 서로 마주 보고 "...", 먹기는 식탁', () => {
+  const layout = layoutRoom(rows('done', 'done', 'done', 'done'));
+  const kinds = new Set();
+  for (let t = T0; t < T0 + 3600 * 1000; t += 1000) {
+    const scene = sceneAt(layout, t, {});
+    const doing = scene.actors.filter((a) => a.activity?.phase === 'do');
+    for (const a of doing) {
+      kinds.add(a.activity.kind);
+      const foot = footOf(a.pose, a.spot);
+      if (a.activity.kind === 'pet') {
+        assert.equal(a.pose, 'crouch');
+        assert.deepEqual([180, 181].includes(frameCell('crouch', t / 500).frame), true);
+        assert.equal(a.mood, 'heart');
+        const cat = catAt(t);
+        assert.ok(Math.hypot(foot.x - cat.x, foot.y - cat.y) <= 22, `고양이 옆 ${foot.x},${foot.y} / ${cat.x},${cat.y}`);
+      }
+      if (a.activity.kind === 'talk') {
+        const other = doing.find((o) => o !== a && o.activity.kind === 'talk' && o.activity.with === a.id);
+        assert.ok(other, '대화 상대가 같은 때 대화 중');
+        assert.equal(a.pose, 'face');
+        // 왼쪽 사람은 오른쪽을, 오른쪽 사람은 왼쪽을 본다
+        const otherFoot = footOf(other.pose, other.spot);
+        assert.equal(a.dir, otherFoot.x > foot.x ? 'right' : 'left');
+        assert.equal(a.mood, 'talk');
+      }
+      if (a.activity.kind === 'eat') assert.ok(['eat', 'drink'].includes(a.pose) && roomOf(a) === 'dining');
+    }
+  }
+  assert.deepEqual([...kinds].sort(), ['eat', 'pet', 'talk']);
+  assert.deepEqual(frameCell('face', 1, 'left'), { frame: 9 });
+  assert.deepEqual(frameCell('face', 1, 'right'), { frame: 13 });
+});
+
+test('W7. 움직이는 사람도 그린 위치에서 누르면 그 사람', () => {
+  const layout = layoutRoom(rows('done', 'done', 'done'));
+  let checked = 0;
+  for (let t = T0; t < T0 + 1200 * 1000 && checked < 20; t += 700) {
+    const scene = sceneAt(layout, t, {});
+    for (const a of scene.actors.filter((x) => x.pose === 'walk' || x.pose === 'crouch' || x.pose === 'face')) {
+      const others = scene.actors.filter((o) => o !== a);
+      const [mx, my] = center(a);
+      if (others.some((o) => { const b = bodyBox(o); return mx >= b.l && mx <= b.r && my >= b.t && my <= b.b; })) continue;
+      assert.equal(actorAt(scene, mx, my)?.id, a.id);
+      checked += 1;
+    }
+  }
+  assert.ok(checked >= 5, `확인한 움직이는 사람 ${checked}`);
+  assert.equal(ACT_BLOCK_MS, 30000);
 });
 
 test('R8. 동작 줄이기 설정이면 프레임 0 고정', () => {
   assert.equal(animFrame(7, true), 0);
   assert.equal(animFrame(7, false), 7);
+});
+
+// codex P2 3건(11-27): 화면처럼 10초마다 목록을 다시 받고, 0.1초마다 그리며 발 위치를 기억해 흉내 낸다
+const simulate = (layouts, from, to, stepMs = 100) => {
+  let walks = new Map();
+  let feet = new Map();
+  let prev = null;
+  const track = [];
+  for (let t = from; t < to; t += stepMs) {
+    const layout = layouts(t);
+    if (layout !== prev) { walks = updateWalks(walks, feet, layout, t, prev); prev = layout; }
+    const scene = sceneAt(layout, t, { walks });
+    feet = scene.feet;
+    track.push({ t, feet: new Map(feet), scene });
+  }
+  return track;
+};
+// 0.1초 사이 발이 이만큼 넘게 움직이면 순간이동(걷기는 최대 8초에 길 하나라 0.1초에 10도트를 넘지 않는다)
+const JUMP = 12;
+const jumps = (track, id) => {
+  const out = [];
+  for (let i = 1; i < track.length; i += 1) {
+    const a = track[i - 1].feet.get(id), b = track[i].feet.get(id);
+    if (a && b && Math.hypot(a.x - b.x, a.y - b.y) > JUMP) out.push({ t: track[i].t, d: Math.hypot(a.x - b.x, a.y - b.y).toFixed(1) });
+  }
+  return out;
+};
+
+test('W8. 목록을 다시 받아도 자리가 그대로면 하던 할 일을 끊지 않는다(10초마다 같은 목록)', () => {
+  const list = rows('done', 'done', 'done');
+  // 10초마다 새 배치 객체(내용은 같다). 화면이 10초마다 목록을 다시 받아 layoutRoom 을 새로 부르는 것과 같다
+  const every10s = new Map();
+  const refreshed = (t) => {
+    const k = Math.floor(t / 10000);
+    if (!every10s.has(k)) every10s.set(k, layoutRoom(list));
+    return every10s.get(k);
+  };
+  const track = simulate(refreshed, T0, T0 + 600 * 1000);
+  for (const a of layoutRoom(list).actors) {
+    assert.deepEqual(jumps(track, a.id), [], `${a.id} 순간이동`);
+    // 할 일을 끝까지 한다: 'do' 가 시작되면 10초 동안 이어진다
+    let run = 0, best = 0;
+    for (const s of track) {
+      const x = s.scene.actors.find((o) => o.id === a.id);
+      run = x.activity?.phase === 'do' ? run + 1 : 0;
+      best = Math.max(best, run);
+    }
+    assert.ok(best >= 95, `${a.id} 할 일이 끊겼다(${best / 10}초)`);
+  }
+});
+
+test('W9. 문 구멍 안에 서 있다가 새 자리로 가도 벽을 지나지 않는다', () => {
+  for (const d of DOORS) {
+    const mid = { x: d.gap.x + d.gap.w / 2, y: d.gap.y + d.gap.h / 2 };
+    for (const f of feetOf()) {
+      const path = walkRoute(mid, f);
+      for (let i = 1; i < path.length; i += 1) {
+        for (let s = 0; s <= 20; s += 1) {
+          const x = path[i - 1].x + ((path[i].x - path[i - 1].x) * s) / 20;
+          const y = path[i - 1].y + ((path[i].y - path[i - 1].y) * s) / 20;
+          assert.ok(onWalkway(x, y), `문 ${mid.x},${mid.y} -> ${f.x},${f.y} 길이 벽 위(${x.toFixed(1)},${y.toFixed(1)})`);
+        }
+      }
+    }
+  }
+});
+
+// codex P2 2차(11-27): 자리는 그대로인데 상태만 바뀌거나(끝남 <-> 기다림, 같은 소파), 대화 상대가 떠나면 순간이동했다
+test('W11. 같은 의자에서 끝남과 기다림이 바뀌어도 순간이동하지 않는다', () => {
+  // 끝났을 때 왼쪽 소파 자리(REST 1번, 기다림의 첫 자리)를 좋아하는 세션
+  const sid = idsWithRest(REST.findIndex((r) => r.spot === WAIT_SEATS[0]), 1)[0];
+  const asDone = layoutRoom([row(sid, 'done')]);
+  const asWait = layoutRoom([row(sid, 'waiting')]);
+  assert.equal(asDone.actors[0].spot, asWait.actors[0].spot, '같은 소파 자리(검사 전제)');
+  for (let c = 0; c < 40; c += 1) {
+    const change = T0 + c * 4500;
+    for (const [a, b] of [[asDone, asWait], [asWait, asDone]]) {
+      const track = simulate((t) => (t < change ? a : b), change - 40 * 1000, change + 60 * 1000);
+      assert.deepEqual(jumps(track, `local_${sid}`), [], `${change - T0}ms 에 ${a.actors[0].kind} -> ${b.actors[0].kind}`);
+    }
+  }
+});
+
+test('W12. 대화 상대가 일하러 가거나 사라져도 남은 사람이 순간이동하지 않는다', () => {
+  const ids = Array.from({ length: 6 }, (_, i) => `s${i}`);
+  const before = layoutRoom(ids.map((id) => row(id, 'done')));
+  for (let c = 0; c < 30; c += 1) {
+    const change = T0 + c * 9000 + 1000;
+    for (const gone of ['s4', 's1']) {
+      const afterWork = layoutRoom(ids.map((id) => row(id, id === gone ? 'working' : 'done')));
+      const afterLeave = layoutRoom(ids.filter((id) => id !== gone).map((id) => row(id, 'done')));
+      for (const after of [afterWork, afterLeave]) {
+        const track = simulate((t) => (t < change ? before : after), change - 30 * 1000, change + 60 * 1000);
+        for (const id of ids) assert.deepEqual(jumps(track, `local_${id}`), [], `${change - T0}ms ${gone} 바뀜, ${id}`);
+      }
+    }
+  }
+});
+
+// codex 3차(11-27): 상태가 바뀐 뒤 대화 짝 중 한 명만 대화했다, 폰에서 침대 Zz 가 그림 위로 잘렸다, 고양이 그림이 없어도 쓰다듬었다
+test('W13. 대화는 늘 둘이 함께 한다(상태가 바뀐 뒤에도)', () => {
+  const ids = Array.from({ length: 6 }, (_, i) => `s${i}`);
+  // codex 가 재현한 시각(2026-11-27 00:02:03Z)과 여러 시각
+  const changes = [Date.UTC(2026, 10, 27, 0, 2, 3), ...Array.from({ length: 20 }, (_, c) => T0 + c * 6000 + 2000)];
+  for (const change of changes) {
+    const before = layoutRoom(ids.map((id) => row(id, id === 's3' ? 'working' : 'done')));
+    const after = layoutRoom(ids.map((id) => row(id, 'done')));
+    const track = simulate((t) => (t < change ? before : after), change - 20 * 1000, change + 90 * 1000, 500);
+    for (const s of track) {
+      for (const a of s.scene.actors.filter((x) => x.activity?.kind === 'talk' && x.activity.phase === 'do')) {
+        const other = s.scene.actors.find((o) => o.id === a.activity.with);
+        assert.ok(other?.activity?.kind === 'talk' && other.activity.phase === 'do', `${new Date(s.t).toISOString()} ${a.id} 혼자 대화`);
+      }
+    }
+  }
+});
+
+test('W14. 폰 배율에서도 침대 Zz 꼬리표가 그림 위로 잘리지 않는다, 고양이 그림이 없으면 고양이와 관련된 할 일을 하지 않는다', () => {
+  for (const r of REST.filter((x) => x.pose === 'bed')) {
+    for (const w of [280, 312, 375]) assert.ok(labelBoxes({ pose: 'bed', spot: r.spot }, labelScale(w)).bubble.t >= 0, `${w}px`);
+  }
+  const layout = layoutRoom(rows('done', 'done', 'done', 'done', 'waiting', 'review'));
+  for (let t = T0; t < T0 + 3600 * 1000; t += 1000) {
+    for (const a of sceneAt(layout, t, { cat: null }).actors) {
+      assert.notEqual(a.mood, 'heart');
+      assert.notEqual(a.activity?.kind, 'pet');
+    }
+  }
+});
+
+test('W10. 상태가 바뀌어 걸어온 뒤 할 일 한가운데로 순간이동하지 않는다', () => {
+  const ids = Array.from({ length: 6 }, (_, i) => `s${i}`);
+  const working = layoutRoom(ids.map((id) => row(id, 'working')));
+  const done = layoutRoom(ids.map((id) => row(id, 'done')));
+  // 여러 시각에 바꿔 본다(할 일 구간 안 여러 곳)
+  for (let c = 0; c < 12; c += 1) {
+    const change = T0 + c * 7000 + 3000;
+    const track = simulate((t) => (t < change ? working : done), change - 2000, change + 90 * 1000);
+    for (const id of ids) assert.deepEqual(jumps(track, `local_${id}`), [], `${change - T0}ms 에 바꿈, ${id}`);
+  }
 });
